@@ -13,11 +13,13 @@ sudo apt-get install python3.7; sudo apt install python3.7-dev;
 sudo apt install python3-pip; python3.7 -m pip install pip;
 pip install --upgrade setuptools;
 ```
+Note: If `python3.7 -m pip install pip` not working, run `wget https://bootstrap.pypa.io/pip/3.7/get-pip.py; python3.7 get-pip.py "pip<23"`
+
 2. Install the requirements.
 ```
 pip install -r requirements.txt
 ```
-3. Download the NLTK Tokenizer. At an interactive Python prompt, run:
+3. (No need to `nltk` for our experiment) Download the NLTK Tokenizer. At an interactive Python prompt, run:
 ```
 > import nltk; nltk.download('punkt')
 ```
