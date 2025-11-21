@@ -2,7 +2,6 @@ import inspect
 import signal
 import random
 import time
-import datetime
 import traceback
 import sys
 import os
@@ -11,84 +10,8 @@ import math
 import pickle as pickle
 from itertools import chain
 import heapq
-from frozendict import frozendict
-import psutil
 
 import hashlib
-import resource
-
-# UTILS FOR ESCAPING TOKENS
-PUNCTUATION_TO_STRING = {
- "0" : 'ZERO',
- "1" : "ONE",
- "2" : "TWO",
- "3" : "THREE",
- "4" : "FOUR",
- "5" : "FIVE",
- "6" : "SIX", 
- "7" : "SEVEN",
- "8" : "EIGHT", 
- "9" : "NINE",
- "+" : "PLUS",
- "-" : "MINUS", 
- "*" : "MULT", 
- "\\" : "DIV"
-}
-DEFAULT_OUTPUT_DIRECTORY = "experimentOutputs"
-
-def limit_virtual_memory_with_psutil_if_possible(process, max_mem_per_enumeration_thread):
-    # Limits the amount of virtual memory if possible. This is only avaialble on Linux.
-    if 'linux' in sys.platform:
-        print(f"Limiting virtual memory to: {max_mem_per_enumeration_thread}")
-        psutil.Process(process.pid).rlimit(
-        psutil.RLIMIT_AS, (max_mem_per_enumeration_thread, max_mem_per_enumeration_thread))
-
-def limit_virtual_memory_fn(max_mem_per_enumeration_thread):
-    # The tuple below is of the form (soft limit, hard limit). Limit only
-    # the soft part so that the limit can be increased later (setting also
-    # the hard limit would prevent that).
-    # When the limit cannot be changed, setrlimit() raises ValueError.
-    print(f"Limiting memory to {max_mem_per_enumeration_thread}")
-    def limit_virtual_memory_to_max():
-        resource.setrlimit(resource.RLIMIT_AS, (max_mem_per_enumeration_thread, resource.RLIM_INFINITY))
-    return limit_virtual_memory_to_max
-
-def get_timestamped_output_directory_for_checkpoints(top_level_output_dir, domain_name):
-    """Creates a timestamped output directory in which to store the checkpoints.
-    Returns the corresponding 'outputPrefix' that should be used for the checkpoints.
-    """
-    timestamp = datetime.datetime.now().isoformat()
-    # Escape the timestamp.
-    timestamp = timestamp.replace(":", "-")
-    timestamp = timestamp.replace(".", "-")
-    outputDirectory = f"experimentOutputs/{domain_name}/{timestamp}"
-    os.system("mkdir -p %s"%outputDirectory)
-    output_prefix = f"{outputDirectory}/{domain_name}"
-    return output_prefix
-
-def convert_iterations_to_training_task_epochs(args, train_tasks):
-    """Converts an args dict containing 'iterations' into the corresponding 'epochs'
-    based on how many tasks there are and the minibatch size.
-    Mutates the 'iterations' argument in args
-    """
-    use_epochs = args.pop("iterations_as_epochs")
-    if use_epochs and args["taskBatchSize"] is not None:
-        print("Using iterations as epochs")
-        intended_epochs = args["iterations"]
-        args["iterations"] *= int(len(train_tasks) / args["taskBatchSize"]) 
-        print(f"Now running for n={intended_epochs} epochs, which with {len(train_tasks)} training tasks is n={args['iterations']} iterations.")
-
-def pop_all_domain_specific_args(args_dict, iterator_fn):
-    """Pops any additional domain-specific arguments that may have been added at the command line
-    but are not present in the main iterator.
-    Mutates: args_dict
-    """
-    print("Popping off additional domain specific arguments:")
-    initial_args = list(args_dict.keys())
-    for arg in initial_args:
-        if arg not in inspect.signature(iterator_fn).parameters:
-            print(f"Arg {arg} not in main iterator function; removing.")
-            args_dict.pop(arg)
 
 def computeMD5hash(my_string):
     #https://stackoverflow.com/questions/13259691/convert-string-to-md5
@@ -389,57 +312,32 @@ def callFork(f, *arguments, **kw):
     assert len(ys) == 1
     return ys[0]
 
+
 PARALLELPROCESSDATA = None
 
-# import multiprocessing
-# multiprocessing.set_start_method('fork');
 
 def launchParallelProcess(f, *a, **k):
-    # global PARALLELPROCESSDATA
+    global PARALLELPROCESSDATA
 
     PARALLELPROCESSDATA = [f, a, k]
+
     from multiprocessing import Process
-    p = Process(target=_launchParallelProcess, args=(PARALLELPROCESSDATA,))
+    p = Process(target=_launchParallelProcess, args=tuple([]))
     p.start()
     PARALLELPROCESSDATA = None
     return p
 
 
-def _launchParallelProcess(PARALLELPROCESSDATA):
-    # global PARALLELPROCESSDATA
+def _launchParallelProcess():
+    global PARALLELPROCESSDATA
     [f, a, k] = PARALLELPROCESSDATA
     try:
-        wrapInThread(f)(*a, **k)
+        f(*a, **k)
     except Exception as e:
         eprint(
             "Exception in worker during forking:\n%s" %
             (traceback.format_exc()))
         raise e
-
-
-def wrapInThread(f):
-    """
-    Returns a function that is designed to be run in a thread/threadlike process.
-    Result will be either put into the q
-    """
-    import dill
-
-    def _f(*a, **k):
-        q = k.pop("q")
-        ID = k.pop("ID")
-
-        try:
-            r = f(*a, **k)
-            q.put(dill.dumps({"result": "success",
-                   "ID": ID,
-                   "value": r}))
-        except Exception as e:
-            q.put(dill.dumps({"result": "failure",
-                   "exception": e,
-                   "stacktrace": traceback.format_exc(),
-                   "ID": ID}))
-            return
-    return _f
 
 
 def jsonBinaryInvoke(binary, message):
@@ -813,7 +711,7 @@ def runWithTimeout(k, timeout):
         signal.signal(signal.SIGPROF, lambda *_:None)
         signal.setitimer(signal.ITIMER_PROF, 0)
         raise RunWithTimeout()
-    except Exception as e:
+    except:
         signal.signal(signal.SIGPROF, lambda *_:None)
         signal.setitimer(signal.ITIMER_PROF, 0)
         raise
@@ -934,17 +832,6 @@ def howManyGigabytesOfMemory():
 
 def tuplify(x):
     if isinstance(x,(list,tuple)): return tuple(tuplify(z) for z in x)
-    if isinstance(x, dict): return frozendict({
-        tuplify(k) : tuplify(v)
-        for (k, v) in x.items()
-    })
-    return x
-def unfrozendict(x):
-    if isinstance(x, (list, tuple)): return tuple(unfrozendict(z) for z in x)
-    if isinstance(x, frozendict): return {
-        unfrozendict(k): unfrozendict(v)
-        for (k, v) in x.items()
-    }
     return x
 
 # image montage!

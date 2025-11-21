@@ -8,18 +8,31 @@ import sys
 from dreamcoder.fragmentGrammar import FragmentGrammar
 from dreamcoder.frontier import Frontier, FrontierEntry
 from dreamcoder.grammar import Grammar
+from dreamcoder.task import Task
 from dreamcoder.program import Program, Invented
 from dreamcoder.utilities import eprint, timing, callCompiled, get_root_dir
 from dreamcoder.vs import induceGrammar_Beta
-from dreamcoder.translation import serialize_language_alignments
 
 
 def induceGrammar(*args, **kwargs):
     if sum(not f.empty for f in args[1]) == 0:
         eprint("No nonempty frontiers, exiting grammar induction early.")
         return args[0], args[1]
+    backend = kwargs.pop("backend", "pypy")
+    if 'pypy' in backend:
+        # pypy might not like some of the imports needed for the primitives
+        # but the primitive values are irrelevant for compression
+        # therefore strip them out and then replace them once we are done
+        # ditto for task data
+        g0,frontiers = args[0].strip_primitive_values(), \
+                       [front.strip_primitive_values() for front in args[1]]
+        original_tasks = {f.task.name: f.task for f in frontiers}
+        frontiers = [Frontier(f.entries, Task(f.task.name,f.task.request,[]))
+                     for f in frontiers ]
+        args = [g0,frontiers]
+
+    
     with timing("Induced a grammar"):
-        backend = kwargs.pop("backend", "pypy")
         if backend == "pypy":
             g, newFrontiers = callCompiled(pypyInduce, *args, **kwargs)
         elif backend == "rust":
@@ -34,16 +47,51 @@ def induceGrammar(*args, **kwargs):
                 pickle.dump((args, kwargs), handle)
             eprint("For debugging purposes, the version space compression invocation has been saved to", fn)
             g, newFrontiers = callCompiled(induceGrammar_Beta, *args, **kwargs)
-        elif backend == "ocaml":
+        elif backend == "ocaml" or backend == "vs_factored":
             kwargs.pop('iteration')
             kwargs.pop('topk_use_only_likelihood')
             kwargs['topI'] = 300
             kwargs['bs'] = 1000000
-            g, newFrontiers = ocamlInduce(*args, **kwargs)
+            g, newFrontiers = ocamlInduce(*args, factored=(backend == "vs_factored"), **kwargs)
+        elif backend == "memorize":
+            g, newFrontiers = memorizeInduce(*args, **kwargs)
         else:
             assert False, "unknown compressor"
+
+    if 'pypy' in backend:
+        g, newFrontiers = g.unstrip_primitive_values(), \
+                          [front.unstrip_primitive_values() for front in newFrontiers]
+        newFrontiers = [Frontier(f.entries, original_tasks[f.task.name])
+                        for f in newFrontiers] 
+        
+
     return g, newFrontiers
 
+def memorizeInduce(g, frontiers, **kwargs):
+    existingInventions = {p.uncurry()
+                          for p in g.primitives }
+    programs = {f.bestPosterior.program for f in frontiers if not f.empty}
+    newInventions = programs - existingInventions
+    newGrammar = Grammar.uniform([p for p in g.primitives] + \
+                                 [Invented(ni) for ni in newInventions])
+    
+    # rewrite in terms of new primitives
+    def substitute(p):
+        nonlocal newInventions
+        if p in newInventions: return Invented(p).uncurry()
+        return p
+    newFrontiers = [Frontier([FrontierEntry(program=np,
+                                            logPrior=newGrammar.logLikelihood(f.task.request, np),
+                                            logLikelihood=e.logLikelihood)
+                           for e in f
+                           for np in [substitute(e.program)] ],
+                             task=f.task)
+                 for f in frontiers ]
+    return newGrammar, newFrontiers
+    
+    
+        
+    
 
 def pypyInduce(*args, **kwargs):
     kwargs.pop('iteration')
@@ -53,11 +101,8 @@ def pypyInduce(*args, **kwargs):
 def ocamlInduce(g, frontiers, _=None,
                 topK=1, pseudoCounts=1.0, aic=1.0,
                 structurePenalty=0.001, a=0, CPUs=1,
-                bs=1000000, topI=300,
-                language_alignments=None,
-                executable=None,
-                lc_score=0.0,
-                max_compression=10000):
+                bs=1000000, topI=300, factored=False):
+    
     # This is a dirty hack!
     # Memory consumption increases with the number of CPUs
     # And early on we have a lot of stuff to compress
@@ -90,12 +135,12 @@ def ocamlInduce(g, frontiers, _=None,
                    "structurePenalty": float(structurePenalty),
                    "CPUs": CPUs,
                    "DSL": g.json(),
-                   "iterations": int(max_compression),
+                   "factored_apply": factored, 
+                   "iterations": iterations,
                    "frontiers": [f.json()
                                  for f in frontiers],
-                   "lc_score": lc_score}
-        if language_alignments is not None:
-            message["language_alignments"] = serialize_language_alignments(language_alignments)
+                    "lc_score": 0.0}
+
         message = json.dumps(message)
         if True:
             timestamp = datetime.datetime.now().isoformat()
@@ -107,8 +152,7 @@ def ocamlInduce(g, frontiers, _=None,
 
         try:
             # Get relative path
-            executable = 'compression' if executable is None else executable
-            compressor_file = os.path.join(get_root_dir(), executable)
+            compressor_file = os.path.join(get_root_dir(), 'compression')
             process = subprocess.Popen(compressor_file,
                                        stdin=subprocess.PIPE,
                                        stdout=subprocess.PIPE)
@@ -124,32 +168,15 @@ def ocamlInduce(g, frontiers, _=None,
                      for l in [production["logProbability"]]
                      for p in [Program.parse(production["expression"])]],
                     continuationType=g0.continuationType)
-        # Wrap this in a try catch in the case of an error
-        def maybe_entry(p, e, g, request):
-            try:
-                return FrontierEntry(p,logLikelihood=e["logLikelihood"],
-                            logPrior=g.logLikelihood(request, p))
-            except:
-                print(f"Error adding frontier entry: {str(p)}")
-                return None
-        
-        new_frontiers = {}
-        for original, new in zip(frontiers, response["frontiers"]):
-            entries =[maybe_entry(p, e, g, original.task.request)
-                      for e in new["programs"]
-                      for p in [Program.parse(e["program"])]]
-            entries = [e for e in entries if e is not None]
-            new_frontiers[original.task] = Frontier(entries, task=original.task)
-        frontiers = new_frontiers
-            
-        # frontiers = {original.task:
-        #                  Frontier([FrontierEntry(p,
-        #                                          logLikelihood=e["logLikelihood"],
-        #                                          logPrior=g.logLikelihood(original.task.request, p))
-        #                            for e in new["programs"]
-        #                            for p in [Program.parse(e["program"])]],
-        #                           task=original.task)
-        #              for original, new in zip(frontiers, response["frontiers"])}
+
+        frontiers = {original.task:
+                         Frontier([FrontierEntry(p,
+                                                 logLikelihood=e["logLikelihood"],
+                                                 logPrior=g.logLikelihood(original.task.request, p))
+                                   for e in new["programs"]
+                                   for p in [Program.parse(e["program"])]],
+                                  task=original.task)
+                     for original, new in zip(frontiers, response["frontiers"])}
         frontiers = [frontiers.get(f.task, t2f[f.task])
                      for f in originalFrontiers]
         if iterations == 1 and len(g) > len(g0):
@@ -158,7 +185,7 @@ def ocamlInduce(g, frontiers, _=None,
         else:
             eprint("Finished consolidation.")
             return g, frontiers
-            
+
 
 def rustInduce(g0, frontiers, _=None,
                topK=1, pseudoCounts=1.0, aic=1.0,

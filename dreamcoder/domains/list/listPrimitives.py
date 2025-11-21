@@ -96,8 +96,6 @@ def _not(x): return not x
 
 def _gt(x): return lambda y: x > y
 
-def _lt(x): return lambda y: x < y
-
 
 def _index(j): return lambda l: l[j]
 
@@ -350,13 +348,7 @@ def bootstrapTarget():
         Primitive("empty?", arrow(tlist(t0), tbool), _isEmpty),
     ] + [Primitive(str(j), tint, j) for j in range(2)]
 
-def re2_list_v0():
-    return bootstrapTarget() + [
-        Primitive("not", arrow(tbool, tbool), _not),
-        Primitive("and", arrow(tbool, tbool, tbool), _and),
-        Primitive("or", arrow(tbool, tbool, tbool), _or),
-    ]
-    
+
 def bootstrapTarget_extra():
     """This is the bootstrap target plus list domain specific stuff"""
     return bootstrapTarget() + [

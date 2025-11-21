@@ -2,7 +2,6 @@ from dreamcoder.dreamcoder import ecIterator
 from dreamcoder.domains.text.makeTextTasks import makeTasks, loadPBETasks
 from dreamcoder.domains.text.textPrimitives import primitives
 from dreamcoder.domains.list.listPrimitives import bootstrapTarget
-from dreamcoder.recognition import *
 from dreamcoder.enumeration import *
 
 import os
@@ -32,34 +31,37 @@ class ConstantInstantiateVisitor(object):
         return Abstraction(e.body.visit(self))
 
 
-class LearnedFeatureExtractor(RecurrentFeatureExtractor):
-    special = 'string'
-    
-    def tokenize(self, examples):
-        def tokenize_example(xs,y):
-            if not isinstance(y, list): y = [y]
-            return xs,y
-        return [tokenize_example(*e) for e in examples]
+try:
+    from dreamcoder.recognition import *
+    class LearnedFeatureExtractor(RecurrentFeatureExtractor):
+        special = 'string'
 
-    def __init__(self, tasks, testingTasks=[], cuda=False):
-        lexicon = {c
-                   for t in tasks + testingTasks
-                   for xs, y in self.tokenize(t.examples)
-                   for c in reduce(lambda u, v: u + v, list(xs) + [y])}
-        self.recomputeTasks = True
+        def tokenize(self, examples):
+            def tokenize_example(xs,y):
+                if not isinstance(y, list): y = [y]
+                return xs,y
+            return [tokenize_example(*e) for e in examples]
 
-        super(LearnedFeatureExtractor, self).__init__(lexicon=list(lexicon),
-                                                      H=64,
-                                                      tasks=tasks,
-                                                      bidirectional=True,
-                                                      cuda=cuda)
-        self.MAXINPUTS = 8
+        def __init__(self, tasks, testingTasks=[], cuda=False):
+            lexicon = {c
+                       for t in tasks + testingTasks
+                       for xs, y in self.tokenize(t.examples)
+                       for c in reduce(lambda u, v: u + v, list(xs) + [y])}
+            self.recomputeTasks = True
 
-    def taskOfProgram(self, p, tp):
-        # Instantiate STRING w/ random words
-        p = p.visit(ConstantInstantiateVisitor.SINGLE)
-        return super(LearnedFeatureExtractor, self).taskOfProgram(p, tp)
+            super(LearnedFeatureExtractor, self).__init__(lexicon=list(lexicon),
+                                                          H=64,
+                                                          tasks=tasks,
+                                                          bidirectional=True,
+                                                          cuda=cuda)
+            self.MAXINPUTS = 8
 
+        def taskOfProgram(self, p, tp):
+            # Instantiate STRING w/ random words
+            p = p.visit(ConstantInstantiateVisitor.SINGLE)
+            return super(LearnedFeatureExtractor, self).taskOfProgram(p, tp)
+except:
+    pass
 
 ### COMPETITION CODE
 
@@ -185,14 +187,6 @@ def main(arguments):
     test, train = testTrainSplit(tasks, 1.)
     eprint("Split tasks into %d/%d test/train" % (len(test), len(train)))
 
-    
-    train = [t for t in train if "Replace ',' w/ '.'" in t.name]
-    train[0].examples = [
-        (x, [c if c != '.' else 'a' for c in y])
-        for (x, y) in train[0].examples
-    ]
-
-
     latest = arguments.pop("latest")
     challenge, challengeCheating = loadPBETasks("data/sygus" if latest else "PBE_Strings_Track")
     eprint("Got %d challenge PBE tasks" % len(challenge))
@@ -232,7 +226,6 @@ def main(arguments):
                                                 (p.name != "unfold" or haveUnfold) and \
                                                 (p.name != "length" or haveLength)])
     challengeGrammar = baseGrammar  # Grammar.uniform(targetTextPrimitives)
-    # import pdb; pdb.set_trace()
 
     evaluationTimeout = 0.0005
     # We will spend 10 minutes on each challenge problem
@@ -263,7 +256,6 @@ def main(arguments):
                 checkpoints.append(dill.load(handle))
         sygusCompetition(checkpoints, challenge)
         sys.exit(0)
-        
 
     timestamp = datetime.datetime.now().isoformat()
     outputDirectory = "experimentOutputs/text/%s"%timestamp
