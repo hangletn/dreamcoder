@@ -7,7 +7,6 @@ def graphPrimitives(result, prefix, view=False):
         eprint("You are missing the graphviz library - cannot graph primitives!")
         return
     
-
     primitives = { p
                    for g in result.grammars
                    for p in g.primitives
@@ -117,7 +116,7 @@ def graphPrimitives(result, prefix, view=False):
     def makeUnorderedGraph(fn):
         g = Digraph()
         g.graph_attr['rankdir'] = 'LR'
-
+        print(primitives)
         for p in primitives:
             g.node(getName(p),
                    label="<%s>"%simplification[p])
@@ -127,6 +126,7 @@ def graphPrimitives(result, prefix, view=False):
                         if k.isInvented}
             for k in children:
                 g.edge(name[k],name[p])
+        print(g)
         try:
             g.render(fn,view=view)
             eprint("Exported primitive graph to",fn)
@@ -177,6 +177,6 @@ def graphPrimitives(result, prefix, view=False):
         
         
 
-    makeGraph(depth2primitives,prefix+'depth.pdf')
-    makeUnorderedGraph(prefix+'unordered.pdf')
+    makeGraph(depth2primitives,prefix+'depth')
+    makeUnorderedGraph(prefix+'unordered')
     #makeGraph(age2primitives,prefix+'iter.pdf')

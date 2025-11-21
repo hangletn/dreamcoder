@@ -57,27 +57,11 @@ specialCharacters = {' ': 'SPACE',
                      ')': 'RPAREN',
                      '(': 'LPAREN'}
 
-re2_text_characters = [chr(ord('a') + j) for j in range(26)] 
-re2_text_primitives = [
-    Primitive("char-eq?", arrow(tcharacter, tcharacter, tboolean), _eq),
-    Primitive("STRING", tstr, None),
-] + [Primitive("'%s'" % c, tcharacter, c) for c in re2_text_characters]
-
-re2_text_4_letter =[
-    Primitive("char-eq?", arrow(tcharacter, tcharacter, tboolean), _eq),
-    Primitive("STRING", tstr, None),
-] + [Primitive("'%s'" % c, tcharacter, c) for c in ['a', 'e', 's', 'r']]
-
-re2_text_6_letter =[
-    Primitive("char-eq?", arrow(tcharacter, tcharacter, tboolean), _eq),
-    Primitive("STRING", tstr, None),
-] + [Primitive("'%s'" % c, tcharacter, c) for c in ['a', 'e', 's', 'r', 'd', 't']]
-
 primitives = [
     Primitive("char-eq?", arrow(tcharacter, tcharacter, tboolean), _eq),
     Primitive("STRING", tstr, None)
 ] + [Primitive("'%s'" % d, tcharacter, d) for d in delimiters if d not in specialCharacters] + \
-    [Primitive(name, tcharacter, value) for value, name in specialCharacters.items()] 
+    [Primitive(name, tcharacter, value) for value, name in specialCharacters.items()]
 
 
 def _cons(x): return lambda y: [x] + y

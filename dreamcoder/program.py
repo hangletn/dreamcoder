@@ -34,6 +34,11 @@ class Program(object):
         except UnificationFailure as e:
             return False
 
+    def wrap_in_abstractions(self, n):
+        for _ in range(n):
+            self = Abstraction(self)
+        return self
+
     def betaNormalForm(self):
         n = self
         while True:
@@ -73,23 +78,6 @@ class Program(object):
             "FATAL: uncurry has a bug. %s : %s, but uncurried to %s : %s" % (self, self.infer(),
                                                                              e, e.infer())
         return e
-        
-    def left_order_tokens(self, show_vars=False):
-        def t(show_vars, tokens, p):
-            if p.isIndex:
-                if show_vars: return tokens + ["VAR"]
-                else: return tokens
-            elif p.isAbstraction:
-                return tokens + t(show_vars, [], p.body)
-            elif p.isApplication:
-                return tokens + t(show_vars, [], p.f) + t(show_vars, [], p.x)
-            elif p.isInvented:
-                return tokens + [str(p)]
-            elif p.isPrimitive:
-                return tokens + [str(p)]
-            else:
-                assert False
-        return t(show_vars, [], self)
 
     def wellTyped(self):
         try:
@@ -153,6 +141,9 @@ class Program(object):
 
     @property
     def isHole(self): return False
+
+    @property
+    def isNamedHole(self): return False
 
     @staticmethod
     def parse(s):
@@ -224,9 +215,10 @@ class Program(object):
             for j,v in enumerate(environment):
                 if s == v: return Index(j)
             if s in Primitive.GLOBALS: return Primitive.GLOBALS[s]
-            assert False
+            assert False, f"could not parse {s}"
         return p(s, [])
-
+                
+                
 
 
 class Application(Program):
@@ -524,8 +516,9 @@ class Abstraction(Program):
             self.hashCode = hash((hash(self.body),))
         return self.hashCode
 
-        """Because Python3 randomizes the hash function, we need to never pickle the hash"""
+        
     def __getstate__(self):
+        """Because Python3 randomizes the hash function, we need to never pickle the hash"""
         return self.body
     def __setstate__(self, state):
         self.body = state
@@ -854,8 +847,41 @@ class Hole(Program):
                                   '<HOLE>')
         return Hole.single, n
 
-
 Hole.single = Hole()
+
+class NamedHole(Program):
+    def __init__(self, n): self.name=n
+
+    def show(self, isFunction): return str(self.name)
+
+    @property
+    def isNamedHole(self): return True
+
+    def __eq__(self, o): return isinstance(o, NamedHole) and self.name==o.name
+
+    def __hash__(self): return hash(self.name)
+
+    def evaluate(self, e):
+        raise Exception('Attempt to evaluate named hole')
+
+    def betaReduce(self):
+        raise Exception('Attempt to beta reduce named hole')
+
+    def inferType(self, context, environment, freeVariables):
+        return context.makeVariable()
+
+    def shift(self, offset, depth=0):
+        raise Exception('Attempt to shift named hl')
+
+    def walk(self, surroundingAbstractions=0): yield surroundingAbstractions, self
+
+    def walkUncurried(self, d=0): yield d, self
+
+    def size(self): return 1
+
+    @staticmethod
+    def _parse(s,n):
+        assert False
 
 
 class ShareVisitor(object):
@@ -1162,7 +1188,38 @@ class EtaLongVisitor(object):
         
 
 
-        
+class StripPrimitiveVisitor():
+    """Replaces all primitives .value's w/ None. Does not destructively modify anything"""
+    def invented(self,e):
+        return Invented(e.body.visit(self))
+    def primitive(self,e):
+        return Primitive(e.name,e.tp,None)
+    def application(self,e):
+        return Application(e.f.visit(self),
+                           e.x.visit(self))
+    def abstraction(self,e):
+        return Abstraction(e.body.visit(self))
+    def index(self,e): return e
+
+class ReplacePrimitiveValueVisitor():
+    """Intended to be used after StripPrimitiveVisitor.
+    Replaces all primitive.value's with their corresponding entry in Primitive.GLOBALS"""
+    def invented(self,e):
+        return Invented(e.body.visit(self))
+    def primitive(self,e):
+        return Primitive(e.name,e.tp,Primitive.GLOBALS[e.name].value)
+    def application(self,e):
+        return Application(e.f.visit(self),
+                           e.x.visit(self))
+    def abstraction(self,e):
+        return Abstraction(e.body.visit(self))
+    def index(self,e): return e
+
+def strip_primitive_values(e):
+    return e.visit(StripPrimitiveVisitor())
+def unstrip_primitive_values(e):
+    return e.visit(ReplacePrimitiveValueVisitor())
+    
 
 # from luke
 class TokeniseVisitor(object):
@@ -1192,6 +1249,35 @@ def untokeniseProgram(l):
     }
     s = " ".join(lookup.get(x, x) for x in l)
     return Program.parse(s)
+
+class _Abstraction():
+    def __init__(self, n, body):
+        self.n, self.body = n, body
+
+    def evaluate(self, environment):
+        return lambda *arguments: self.body.evaluate(list(arguments) + environment)
+class _Apply():
+    def __init__(self, f, *xs):
+        self.f = f
+        self.xs = xs
+
+    def evaluate(self, environment):
+        return self.f.evaluate(environment)(*[x.evaluate(environment)
+                                              for x in self.xs ])
+
+def to_fast_program(p):
+    if p.isAbstraction:
+        n=0
+        while p.isAbstraction:
+            p=p.body
+            n+=1
+        return _Abstraction(n, to_fast_program(p))
+    if p.isApplication:
+        f, xs = p.applicationParse()
+        return _Apply(to_fast_program(f),
+                      *[to_fast_program(x) for x in xs])
+    return p
+
 
 if __name__ == "__main__":
     from dreamcoder.domains.arithmetic.arithmeticPrimitives import *
