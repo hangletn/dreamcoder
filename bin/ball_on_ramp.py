@@ -11,7 +11,6 @@ from dreamcoder.program import Primitive
 from dreamcoder.task import Task
 from dreamcoder.type import arrow, tint, tlist, tbool, treal, tpair, t0, t1, t2
 from dreamcoder.utilities import numberOfCPUs
-from makeListTasks import get_sim_info
 
 # Define primitives_map
 def _always(f): return lambda x: all([f(i) for i in x])
@@ -96,15 +95,15 @@ def generate_dummy_data(box_pos, trace_len=10):
     
     """
     seq_len = 100
-    vert_pos = 25
-    horizon_pos = 60
+    vert_pos = 25.0
+    horizon_pos = 60.0
     ramp_coeff, ramp_offset = vert_pos / horizon_pos,  vert_pos
     box_pos_x = int(box_pos * seq_len)
     box_pos_y = -ramp_coeff * box_pos_x + ramp_offset
     x_ramp = np.arange(horizon_pos)
     y_ramp = -ramp_coeff * x_ramp + ramp_offset
     x_horz = np.arange(horizon_pos, seq_len)
-    y_horz = np.zeros(seq_len - horizon_pos)
+    y_horz = np.zeros(int(seq_len - horizon_pos))
     x_pos_no_obs = np.concatenate([x_ramp, x_horz])
     y_pos_no_obs = np.concatenate([y_ramp, y_horz])
     x_pos = np.zeros(seq_len)
@@ -125,8 +124,8 @@ def generate_dummy_data(box_pos, trace_len=10):
         start_idx, end_idx = i, i + trace_len
         examples.append(
             {
-                "ball_x": x_pos[start_idx : end_idx],
-                "ball_y": y_pos[start_idx : end_idx],
+                "ball_x": list(x_pos[start_idx : end_idx]),
+                "ball_y": list(y_pos[start_idx : end_idx]),
                 "obstacle_x": box_pos_x,
                 "obstacle_y": box_pos_y,
                 "move_x": move_x[end_idx-1],
@@ -160,11 +159,11 @@ if __name__ == "__main__":
 
     # Create grammar
     grammar = Grammar.uniform(primitives)
-    box_ratios_train = [i for i in range(10) if i % 3 != 0] / 10.0
-    box_ratios_test = [i for i in range(10) if i % 3 == 0] / 10.0
+    box_ratios_train = [i/10.0 for i in range(10) if i % 3 != 0]
+    box_ratios_test = [i/10.0 for i in range(10) if i % 3 == 0]
 
     training_examples = [
-        {"name": f"box_pos_{box_pos}", "examples": [generate_dummy_data(box_pos)]} for box_pos in box_ratios_train
+        {"name": f"box_pos_{box_pos}", "examples": generate_dummy_data(box_pos)} for box_pos in box_ratios_train
     ] 
 
     training = [get_ball_on_ramp_task(item) for item in training_examples]
@@ -172,7 +171,7 @@ if __name__ == "__main__":
     # Testing data
 
     testing_examples = [
-        {"name": f"box_pos_{box_pos}", "examples": [get_sim_data(box_pos)]} for box_pos in box_ratios_test
+        {"name": f"box_pos_{box_pos}", "examples": generate_dummy_data(box_pos)} for box_pos in box_ratios_test
     ]
     testing = [get_ball_on_ramp_task(item) for item in testing_examples]
 
