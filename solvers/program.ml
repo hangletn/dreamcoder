@@ -782,11 +782,44 @@ let primitive_reducei = primitive "reducei" ((tint @> t1 @> t0 @> t1) @> t1 @> (
 let primitive_filter = primitive "filter" ((tint @> tboolean) @> (tlist tint) @> (tlist tint)) (fun f l -> List.filter ~f:f l);;
 let primitive_equal = primitive "eq?" (tint @> tint @> tboolean) (fun (a : int) (b : int) -> a = b);;
 let primitive_equal0 = primitive "eq0" (tint @> tboolean) (fun (a : int) -> a = 0);;
+let primitive_equal0_real = primitive "eq0_real" (treal @> tboolean) (fun (a : float) -> a = 0.0);;
+let primitive_gt0_real = primitive "gt0_real" (treal @> tboolean) (fun (a : float) -> a > 0.0);;
+let primitive_equal = primitive "eq_real" (treal @> treal @> tboolean) (fun (a : float) (b : float) -> a = b);;
+let primitive_equal = primitive "gt_real" (treal @> treal @> tboolean) (fun (a : float) (b : float) -> a > b);;
 let primitive_not = primitive "not" (tboolean @> tboolean) (not);;
 let primitive_and = primitive "and" (tboolean @> tboolean @> tboolean) (fun x y -> x && y);;
 let primitive_nand = primitive "nand" (tboolean @> tboolean @> tboolean) (fun x y -> not (x && y));;
 let primitive_or = primitive "or" (tboolean @> tboolean @> tboolean) (fun x y -> x || y);;
 let primitive_greater_than = primitive "gt?" (tint @> tint @> tboolean) (fun (x: int) (y: int) -> x > y);;
+let primitive_pair = primitive "pair" (tboolean @> tboolean @> (tpair tboolean tboolean)) (fun x y -> (x, y));;
+let primitive_pair_first = primitive "pair_first" ((tpair tboolean tboolean) @> tboolean) (fun (x,_) -> x);;
+let primitive_pair_second = primitive "pair_second" ((tpair tboolean tboolean) @> tboolean) (fun (_,x) -> x);;
+
+let primitive_always = primitive "always" ((treal @> tboolean) @> (tlist treal) @> (tboolean)) 
+  (fun phi xs -> 
+    List.for_all xs ~f:phi
+  );;
+let primitive_eventually = primitive "eventually" ((treal @> tboolean) @> (tlist treal) @> tboolean)
+  (fun phi xs ->
+    List.exists xs ~f:phi
+  );;
+
+let primitive_until = primitive "until" ((treal @> tboolean) @> (treal @> tboolean) @> (tlist treal) @> tboolean)
+  (fun phi psi xs ->
+    let rec aux prefix_ok = function
+      | [] -> false
+      | x :: rest ->
+        if psi x && prefix_ok
+        then true
+        else
+          let prefix_ok_new = prefix_ok && phi x in
+          if (not prefix_ok_new)
+            then false
+          else
+            aux prefix_ok_new rest
+    in
+    aux true xs
+  );;
 
 ignore(primitive "take-word" (tcharacter @> tstring @> tstring) (fun c s ->
     List.take_while s ~f:(fun c' -> not (c = c'))));;

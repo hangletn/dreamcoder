@@ -128,6 +128,14 @@ def create_env(config_filepath, args):
     box_body, box_shape = add_box_on_ramp(space, r_segment, h_segment, args.box_position)
     return space, body, box_body
 
+def get_sim_info(box_pos, trace_len=10, num_examples=50):
+    """
+    Input: box_pos: float(0, 1), trace_len: int, num_examples: int
+    Output: List([(pos_x: [float], pos_y[float], obstacle_x: float, obstacle_y: float), out: move_x: bool, move_y: bool])
+    
+    """
+    raise NotImplementedError
+
 def simulate_env(space, body, args):
     dt = args.dt
     simulation_time = args.simulation_time
