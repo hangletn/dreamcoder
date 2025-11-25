@@ -1,45 +1,4 @@
-"""
-Generate a JSONL dataset of temporal windows from ball on ramp.
 
-Each line in the output file is ONE example:
-{
-  "name": "ramp_window_t0.30",
-  "input": {
-    "body_x": [ ... h+1 floats ... ],
-    "body_y": [ ... h+1 floats ... ],
-    "obstacle_x": float,
-    "obstacle_y": float,
-    "ball_radius": float,
-    "box_size": float, # square side length
-    "ramp_theta": float # radians
-  },
-  "output": {
-    "move_x": bool,
-    "still_x": bool,
-    "move_y": bool,
-    "still_y": bool
-  },
-  "meta": {
-    "t": float, # box placement param on ramp, 0..1
-    "dt": float,
-    "start_index": int, # window start index i
-    "h": int, # window length
-    "sim_steps": int # total steps in rollout
-  }
-}
-
-Usage example:
-  python get_jsonl.py \
-    --config_filepath config.yaml \
-    --out_jsonl datasets/ramp_temporal.jsonl \
-    --positions 0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9  (or just have one is also fine)\
-    --num_examples 50 \
-    --dt 0.02 \
-    --simulation_time 2.0 \
-    --window_h 10 \
-    --eps 1e-3 \
-    --jitter_px 2.0 --save_video --video_folder videos
-"""
 
 import argparse
 import json
@@ -71,6 +30,32 @@ def ramp_point_and_angle(seg: pymunk.Segment, u: float):
     p = a + u * (b - a)
     angle = math.atan2((b - a).y, (b - a).x)
     return p, angle
+
+def get_box_leftmost_corners(box_body: pymunk.Body, box_size: tuple):
+    """Get bottom-left and top-left corners of rotated box."""
+    box_center_x = float(box_body.position.x)
+    box_center_y = float(box_body.position.y)
+    box_angle = float(box_body.angle)
+    box_width = float(box_size[0])
+    box_height = float(box_size[1])
+    
+    cos_a = math.cos(box_angle)
+    sin_a = math.sin(box_angle)
+    
+    # Bottom-left and top-left corners in local coordinates
+    bottom_left_local = (-box_width/2, -box_height/2)
+    top_left_local = (-box_width/2, box_height/2)
+    
+    # Rotate and translate corners
+    def rotate_point(dx, dy):
+        rotated_x = box_center_x + dx * cos_a - dy * sin_a
+        rotated_y = box_center_y + dx * sin_a + dy * cos_a
+        return (rotated_x, rotated_y)
+    
+    bottom_left = rotate_point(*bottom_left_local)
+    top_left = rotate_point(*top_left_local)
+    
+    return bottom_left, top_left
 
 def add_box_on_ramp(space: pymunk.Space, ramp: pymunk.Segment, ground: pymunk.Segment, t: float, size=(50.0, 50.0), friction=0.9, elasticity=0.05):
     """
@@ -161,16 +146,21 @@ def create_env(config_filepath: str, box_t: float, jitter_px: float = 0.0, seed=
 
     box_cfg = cfg["box"]
     box_size = tuple(box_cfg["size"])
-    box_body, _ = add_box_on_ramp(space, r_seg, g_seg, box_t, size=box_size, friction=box_cfg.get("friction", 0.9), elasticity=box_cfg.get("elasticity", 0.05),
-    )
+    # Set elasticity to 0 to prevent bouncing - ball should stop when it hits obstacle
+    box_elasticity = 0.0  # No bouncing
+    box_body, _ = add_box_on_ramp(space, r_seg, g_seg, box_t, size=box_size, friction=box_cfg.get("friction", 0.9), elasticity=box_elasticity)
 
     ramp_theta = ramp_point_and_angle(r_seg, 0.5)[1]
+    # Get both bottom-left and top-left corners of obstacle
+    bottom_left, top_left = get_box_leftmost_corners(box_body, box_size)
     params = {
         "ball_radius": float(ball["radius"]),
         "box_size": float(box_size[0]), # assume square; use width
         "ramp_theta": float(ramp_theta),
-        "obstacle_x": float(box_body.position.x),
-        "obstacle_y": float(box_body.position.y),
+        "obstacle_bottom_left_x": bottom_left[0],
+        "obstacle_bottom_left_y": bottom_left[1],
+        "obstacle_top_left_x": top_left[0],
+        "obstacle_top_left_y": top_left[1],
     }
     return space, body, params
 
@@ -201,8 +191,10 @@ def render(space: pymunk.Space, size=(640, 480), xlim=(0, 640), ylim=(-10, 480))
 
     fig.canvas.draw()
     w, h = fig.canvas.get_width_height()
-    buf = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-    img = buf.reshape((h, w, 3))
+    buf = np.frombuffer(fig.canvas.tostring_argb(), dtype=np.uint8)
+    # ARGB format: reshape to (h, w, 4) then take RGB channels (skip alpha)
+    img_argb = buf.reshape((h, w, 4))
+    img = img_argb[:, :, 1:4]  # Take RGB channels, skip alpha (first channel)
 
     plt.close(fig)
     return img
@@ -232,7 +224,7 @@ def make_windows(xs, ys, h):
     """
     Produce windows of length h+1 for features (t = i..i+h),
     ensuring we have t = i+h+1 for labels.
-    Returns: list of (start_i, x_window_{h+1}, y_window_{h+1}, x_next, y_next)
+    Returns: list of (start_i, x_window, y_window, x_next, y_next)
     """
     out = []
     n = len(xs)
@@ -249,13 +241,32 @@ def next_step_bools(xw, yw, x_next, y_next, eps=1e-3):
     """
     Compute booleans for motion between the last point in the window (t=i+h)
     and the next point (t=i+h+1).
+    
+    Simple approach: check if position changed between time steps.
+    - If difference > eps: ball is moving
+    - If difference <= eps: ball is stopped
+    
+    move_x: True if ball is moving in x direction (either direction)
+    still_x: True if ball is not moving in x direction (complement of move_x)
+    move_y: True if ball is moving in y direction (either direction)
+    still_y: True if ball is not moving in y direction (complement of move_y)
+    
+    Args:
+        xw, yw: position windows (length h+1)
+        x_next, y_next: next position
+        eps: position change threshold (if change is smaller than this, consider stopped)
     """
+    # Simple check: did position change between last point in window and next point?
     dx = x_next - xw[-1]
     dy = y_next - yw[-1]
-    move_x  = dx > eps
-    still_x = abs(dx) <= eps
-    move_y  = dy > eps
-    still_y = abs(dy) <= eps
+    
+    # Ball is moving if position changed by more than eps
+    move_x = abs(dx) > eps
+    move_y = abs(dy) > eps
+    
+    still_x = not move_x
+    still_y = not move_y
+    
     return {
         "move_x": bool(move_x),
         "still_x": bool(still_x),
@@ -269,11 +280,11 @@ def main():
     ap.add_argument("--config_filepath", type=str, default="config.yaml")
     ap.add_argument("--dt", type=float, default=0.02, help="simulation time step")
     ap.add_argument("--simulation_time", type=float, default=2.0, help="total simulated seconds")
-    ap.add_argument("--positions", type=str, default="0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9",
+    ap.add_argument("--positions", type=str, default="0.5",
                     help="comma-separated t values (0..1) for obstacle placement along ramp")
     ap.add_argument("--num_examples", type=int, default=50, help="rollouts per t")
     ap.add_argument("--window_h", type=int, default=10, help="window length h (we store h+1 points)")
-    ap.add_argument("--eps", type=float, default=1e-3, help="tolerance for 'still' vs 'move'")
+    ap.add_argument("--eps", type=float, default=1e-3, help="tolerance for 'still' vs 'move' (position change threshold)")
     ap.add_argument("--jitter_px", type=float, default=2.0, help="random start jitter for the ball")
     ap.add_argument("--seed", type=int, default=123)
     ap.add_argument("--out_jsonl", type=str, default="datasets/ramp_temporal.jsonl")
@@ -322,8 +333,10 @@ def main():
                         "input": {
                             "body_x": xw,
                             "body_y": yw,
-                            "obstacle_x": params["obstacle_x"],
-                            "obstacle_y": params["obstacle_y"],
+                            "obstacle_bottom_left_x": params["obstacle_bottom_left_x"],
+                            "obstacle_bottom_left_y": params["obstacle_bottom_left_y"],
+                            "obstacle_top_left_x": params["obstacle_top_left_x"],
+                            "obstacle_top_left_y": params["obstacle_top_left_y"],
                             "ball_radius": params["ball_radius"],
                             "box_size": params["box_size"],
                             "ramp_theta": params["ramp_theta"],
