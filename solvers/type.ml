@@ -282,6 +282,7 @@ let tvar               = make_ground "var"
 let tprogram           = make_ground "program"
 let tmaybe t           = kind "maybe" [t]
 let tcanvas            = tlist tint
+let tpair a b = TCon ("pair", [a; b], false);;
 
 (** CLEVR Types -- types.ml **)
 let tclevrcolor = make_ground "tclevrcolor";;
