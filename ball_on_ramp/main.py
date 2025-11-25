@@ -9,7 +9,7 @@ from dreamcoder.ec import commandlineArguments, ecIterator
 from dreamcoder.grammar import Grammar
 from dreamcoder.program import Primitive
 from dreamcoder.task import Task
-from dreamcoder.type import arrow, tint, tlist, tbool, treal, tpair, t0, t1, t2
+from dreamcoder.type import arrow, tint, tlist, tbool, treal, tpair
 from dreamcoder.utilities import numberOfCPUs
 from makeListTasks import get_sim_info
 
@@ -18,16 +18,17 @@ def _always(f): return lambda x: all([f(i) for i in x])
 
 def _eventually(f): return lambda x: any([f(i) for i in x])
 
-def _until(phi, psi):
-    def until_predicate(trace):
-        n = len(trace)
-        for i in range(n):
-            if psi(trace[i]):
-                if all(phi(trace[j]) for j in range(i)):
-                    return True
-        return False
-    return until_predicate
-
+def _until(phi):
+    def with_psi(psi):
+        def until_predicate(trace):
+            n = len(trace)
+            for i in range(n):
+                if psi(trace[i]):
+                    if all(phi(trace[j]) for j in range(i)):
+                        return True
+            return False
+        return until_predicate
+    return with_psi
 
 def _eq(x): return lambda y: x == y
 
@@ -43,97 +44,85 @@ def _eq0(x): return x == 0.0
 
 def _gt0(x): return x > 0.0
 
-def primitives():
+def _pair(x):
+    return lambda y: (x, y)
+
+def _first(x):
+    return x[0]
+
+def _second(x):
+    return x[1]
+
+def get_primitives():
     return [
         Primitive("true", tbool, True),
         Primitive("not", arrow(tbool, tbool), _not),
         Primitive("and", arrow(tbool, tbool, tbool), _and),
         Primitive("or", arrow(tbool, tbool, tbool), _or),
-        Primitive("eq?", arrow(tint, tint, tbool), _eq),
-        Primitive("gt?", arrow(tint, tint, tbool), _gt),
+        Primitive("eq_real", arrow(treal, treal, tbool), _eq),
+        Primitive("gt_real", arrow(treal, treal, tbool), _gt),
         Primitive("eq0_real", arrow(treal, tbool), _eq0),
         Primitive("gt0_real", arrow(treal, tbool), _gt0),
-        Primitive("always", arrow(arrow(t0, tbool), tlist(t0), tbool), _always),
-        Primitive("eventually", arrow(arrow(t0, tbool), tlist(t0), tbool), _eventually),
-        Primitive("until", arrow(arrow(t0, tbool), arrow(t0, tbool), tlist(t0), tbool), _until),
+        Primitive("always", arrow(arrow(treal, tbool), tlist(treal), tbool), _always),
+        Primitive("eventually", arrow(arrow(treal, tbool), tlist(treal), tbool), _eventually),
+        Primitive("until", arrow(arrow(treal, tbool), arrow(treal, tbool), tlist(treal), tbool), _until),
+        Primitive("pair", arrow(tbool, tbool, tpair(tbool, tbool)), _pair),
+        Primitive("pair_first", arrow(tpair(tbool, tbool), tbool), _first),
+        Primitive("pair_second", arrow(tpair(tbool, tbool), tbool), _second),
     ]
 
 
 # TYPE: (list[float], list[float], ) -> (bool, bool)
-def get_ball_on_ramp_task(item):
-    return Task(
-        item["name"],
-        arrow(
-            tlist(treal), # x_pos
-            tlist(treal), # y_pos
-            treal, # x_obstacle
-            treal, #y_obstacle
-            tpair(tbool, tbool), # (move_x, move_y)
-        ),
-        examples= [
-            (
+# TODO: Split into `move_x` and `move_y`
+def get_ball_on_ramp_task(item, move="x"):
+    if move == "x":
+        return Task(
+            item['name'] + "_x",
+            arrow(
+                tlist(treal), # x_pos
+                tlist(treal), # y_pos
+                treal, # x_obstacle
+                treal, #y_obstacle
+                tbool # (move_x)
+            ),
+            examples= [
                 (
-                    ex["ball_x"],
-                    ex["ball_y"],
-                    ex["obstacle_x"],
-                    ex["obstacle_y"],
-                ),
-                (
+                    (
+                        ex["ball_x"],
+                        ex["ball_y"],
+                        ex["obstacle_x"],
+                        ex["obstacle_y"],
+                    ),
                     ex["move_x"],
+                )
+                for ex in item["examples"]
+            ]
+        )
+    elif move == "y":
+        return Task(
+            item['name'] + "_y",
+            arrow(
+                tlist(treal), # x_pos
+                tlist(treal), # y_pos
+                treal, # x_obstacle
+                treal, #y_obstacle
+                tbool # (move_x)
+            ),
+            examples= [
+                (
+                    (
+                        ex["ball_x"],
+                        ex["ball_y"],
+                        ex["obstacle_x"],
+                        ex["obstacle_y"],
+                    ),
                     ex["move_y"],
                 )
-
-            )
-            for ex in item["examples"]
-        ]
-    )
-
-def generate_dummy_data(box_pos, trace_len=10):
-    import numpy as np
-    """
-    Input: box_pos: float(0, 1), trace_len: int, num_examples: int
-    Output: List([(pos_x: [float], pos_y[float], obstacle_x: float, obstacle_y: float), out: move_x: bool, move_y: bool])
-    
-    """
-    seq_len = 100
-    vert_pos = 25
-    horizon_pos = 60
-    ramp_coeff, ramp_offset = vert_pos / horizon_pos,  vert_pos
-    box_pos_x = int(box_pos * seq_len)
-    box_pos_y = -ramp_coeff * box_pos_x + ramp_offset
-    x_ramp = np.arange(horizon_pos)
-    y_ramp = -ramp_coeff * x_ramp + ramp_offset
-    x_horz = np.arange(horizon_pos, seq_len)
-    y_horz = np.zeros(seq_len - horizon_pos)
-    x_pos_no_obs = np.concatenate([x_ramp, x_horz])
-    y_pos_no_obs = np.concatenate([y_ramp, y_horz])
-    x_pos = np.zeros(seq_len)
-    y_pos = np.zeros(seq_len)
-    for i in range(seq_len):
-        if i < box_pos_x:
-            x_pos[i] = x_pos_no_obs[i]
-            y_pos[i] = y_pos_no_obs[i]
-        else:
-            x_pos[i] = box_pos_x
-            y_pos[i] = box_pos_y
-    move_x = [True if x_pos[i] != x_pos[i+1] else False for i in range(len(x_pos)-1)] + [False]
-    move_y = [True if y_pos[i] != y_pos[i+1] else False for i in range(len(y_pos)-1)] + [False]
-
-    # Generate example list
-    examples = []
-    for i in range(0, seq_len-trace_len-1, 2):
-        start_idx, end_idx = i, i + trace_len
-        examples.append(
-            {
-                "ball_x": x_pos[start_idx : end_idx],
-                "ball_y": y_pos[start_idx : end_idx],
-                "obstacle_x": box_pos_x,
-                "obstacle_y": box_pos_y,
-                "move_x": move_x[end_idx-1],
-                "move_y": move_y[end_idx-1],
-            }
+                for ex in item["examples"]
+            ]
         )
-    return examples
+    else:
+        raise ValueError("Not implemented")
 
 if __name__ == "__main__":
 
@@ -152,29 +141,25 @@ if __name__ == "__main__":
     args.update({"outputPrefix": outprefix})
 
     # Create list of primitives
-    primitives = [
-        Primitive("always", arrow(tint, tint), _always),
-        Primitive("eventually", arrow(tint, tint), _eventually),
-        Primitive("until", arrow(tint, tint), _until),
-    ]
+    primitives = get_primitives()
 
     # Create grammar
     grammar = Grammar.uniform(primitives)
-    box_ratios_train = [i for i in range(10) if i % 3 != 0] / 10.0
-    box_ratios_test = [i for i in range(10) if i % 3 == 0] / 10.0
+    box_ratios_train = [i/10.0 for i in range(10) if i % 3 != 0]
+    box_ratios_test = [i/10.0 for i in range(10) if i % 3 == 0]
 
     training_examples = [
-        {"name": f"box_pos_{box_pos}", "examples": [generate_dummy_data(box_pos)]} for box_pos in box_ratios_train
+        {"name": f"box_pos_{box_pos}", "examples": get_sim_info(box_pos)} for box_pos in box_ratios_train
     ] 
 
-    training = [get_ball_on_ramp_task(item) for item in training_examples]
+    training = [get_ball_on_ramp_task(item, move="x") for item in training_examples] + [get_ball_on_ramp_task(item, move="y") for item in training_examples]
 
     # Testing data
 
     testing_examples = [
-        {"name": f"box_pos_{box_pos}", "examples": [get_sim_data(box_pos)]} for box_pos in box_ratios_test
+        {"name": f"box_pos_{box_pos}", "examples": get_sim_info(box_pos)} for box_pos in box_ratios_test
     ]
-    testing = [get_ball_on_ramp_task(item) for item in testing_examples]
+    testing = [get_ball_on_ramp_task(item, move="x") for item in testing_examples] + [get_ball_on_ramp_task(item, move="y") for item in testing_examples]
 
     # EC iterate
 
