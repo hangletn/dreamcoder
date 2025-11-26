@@ -105,7 +105,7 @@ def get_ball_on_ramp_task(item, move="x"):
                 tlist(treal), # y_pos
                 treal, # x_obstacle
                 treal, #y_obstacle
-                tbool # (move_x)
+                tbool # (move_y)
             ),
             examples= [
                 (
@@ -191,19 +191,25 @@ if __name__ == "__main__":
 
     # Create grammar
     grammar = Grammar.uniform(primitives)
-    box_ratios_train = [i/10.0 for i in range(10) if i % 3 != 0]
+    box_ratios_train = [i/10.0 for i in range(10)]
     box_ratios_test = [i/10.0 for i in range(10) if i % 3 == 0]
 
+    training_examples_list = []
+    for i in box_ratios_train:
+        training_examples_list += generate_dummy_data(i)
     training_examples = [
-        {"name": f"box_pos_{box_pos}", "examples": generate_dummy_data(box_pos)} for box_pos in box_ratios_train
-    ] 
+        {"name": "move", "examples": training_examples_list}
+    ]
 
     training = [get_ball_on_ramp_task(item, move="x") for item in training_examples] + [get_ball_on_ramp_task(item, move="y") for item in training_examples]
 
     # Testing data
 
+    testing_examples_list = []
+    for i in box_ratios_test:
+        testing_examples_list += generate_dummy_data(i)
     testing_examples = [
-        {"name": f"box_pos_{box_pos}", "examples": generate_dummy_data(box_pos)} for box_pos in box_ratios_test
+        {"name": "move", "examples": testing_examples_list}
     ]
     testing = [get_ball_on_ramp_task(item, move="x") for item in testing_examples] + [get_ball_on_ramp_task(item, move="y") for item in testing_examples]
 
