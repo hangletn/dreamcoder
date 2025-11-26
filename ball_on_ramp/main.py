@@ -11,7 +11,8 @@ from dreamcoder.program import Primitive
 from dreamcoder.task import Task
 from dreamcoder.type import arrow, tint, tlist, tbool, treal, tpair
 from dreamcoder.utilities import numberOfCPUs
-from makeListTasks import get_sim_info
+from .makeListTasks import get_sim_info, get_available_positions
+from .temporal_feature_extractor import TemporalFeatureExtractor
 
 # Define primitives_map
 def _always(f): return lambda x: all([f(i) for i in x])
@@ -126,40 +127,76 @@ def get_ball_on_ramp_task(item, move="x"):
 
 if __name__ == "__main__":
 
+    # args = commandlineArguments(
+    #     enumerationTimeout=10, activation="tanh",
+    #     iterations=2, recognitionTimeout=1000,
+    #     a=3, maximumFrontier=10, topK=2, pseudoCounts=30.0,
+    #     helmholtzRatio=0.5, structurePenalty=1.,
+    #     CPUs=numberOfCPUs(),
+    #     cuda=False,  # Disable CUDA to avoid cuDNN errors
+    # )
     args = commandlineArguments(
         enumerationTimeout=10, activation="tanh",
-        iterations=5, recognitionTimeout=1000,
+        iterations=2, recognitionTimeout=1000,
         a=3, maximumFrontier=10, topK=2, pseudoCounts=30.0,
-        helmholtzRatio=0.5, structurePenalty=1.,
+        helmholtzRatio=0.2,  # lower: more weight on real replay once we get hits
+        structurePenalty=1.,
         CPUs=numberOfCPUs(),
+        cuda=False,
     )
 
     timestamp = datetime.datetime.now().isoformat()
     outdir = 'experimentOutputs/ball_on_ramp/'
     os.makedirs(outdir, exist_ok=True)
     outprefix = outdir + timestamp
-    args.update({"outputPrefix": outprefix})
+    args.update({
+        "outputPrefix": outprefix,
+        "featureExtractor": TemporalFeatureExtractor,  # Re-enable recognition model
+    })
 
     # Create list of primitives
     primitives = get_primitives()
 
     # Create grammar
     grammar = Grammar.uniform(primitives)
-    box_ratios_train = [i/10.0 for i in range(10) if i % 3 != 0]
-    box_ratios_test = [i/10.0 for i in range(10) if i % 3 == 0]
 
-    training_examples = [
-        {"name": f"box_pos_{box_pos}", "examples": get_sim_info(box_pos)} for box_pos in box_ratios_train
-    ] 
+    available_positions = get_available_positions()
+    if not available_positions:
+        raise RuntimeError("No obstacle positions found in datasets/ramp_temporal.jsonl. Generate data first.")
 
-    training = [get_ball_on_ramp_task(item, move="x") for item in training_examples] + [get_ball_on_ramp_task(item, move="y") for item in training_examples]
+    available_positions = sorted(available_positions)
+    box_ratios_train = [t for idx, t in enumerate(available_positions) if idx % 3 != 0]
+    box_ratios_test = [t for idx, t in enumerate(available_positions) if idx % 3 == 0]
 
-    # Testing data
+    if not box_ratios_train:
+        box_ratios_train = available_positions[:-1] or available_positions
+        box_ratios_test = available_positions[-1:] if len(available_positions) > 1 else []
 
-    testing_examples = [
-        {"name": f"box_pos_{box_pos}", "examples": get_sim_info(box_pos)} for box_pos in box_ratios_test
-    ]
-    testing = [get_ball_on_ramp_task(item, move="x") for item in testing_examples] + [get_ball_on_ramp_task(item, move="y") for item in testing_examples]
+    def make_examples(positions):
+        """
+        Like other DreamCoder domains: each task gets all its examples.
+        No subsampling—use the entire dataset generated for each position.
+        Control dataset size via num_examples in get_ball_jsonl.py instead.
+        """
+        tasks = []
+        for box_pos in positions:
+            examples = get_sim_info(box_pos)
+            if not examples:
+                continue
+            tasks.append({"name": f"box_pos_{box_pos:.3f}", "examples": examples})
+        return tasks
+
+    training_examples = make_examples(box_ratios_train)
+    testing_examples = make_examples(box_ratios_test)
+
+    training = (
+        [get_ball_on_ramp_task(item, move="x") for item in training_examples]
+        + [get_ball_on_ramp_task(item, move="y") for item in training_examples]
+    )
+    testing = (
+        [get_ball_on_ramp_task(item, move="x") for item in testing_examples]
+        + [get_ball_on_ramp_task(item, move="y") for item in testing_examples]
+    )
 
     # EC iterate
 

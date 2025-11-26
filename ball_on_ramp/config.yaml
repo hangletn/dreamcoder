@@ -16,11 +16,11 @@ ball:
   mass: 1.0
   moment: 10.0
   position: [50, 150]
-  elasticity: 0.5
+  elasticity: 0.0
   friction: 0.5
   radius: 20.0
 
 box:
   size: [50, 50]
   friction: 0.9
-  elasticity: 0.05
+  elasticity: 0.00

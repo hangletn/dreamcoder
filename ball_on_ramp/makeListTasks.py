@@ -8,173 +8,102 @@ import imageio
 import math
 import yaml
 import os
-from datetime import datetime
-import argparse
-import pickle
+from collections import defaultdict
+import json
+import os
+from collections import defaultdict
 
-def save_video(frames: list, path: str, fps=60):
+
+_JSONL_CACHE = None
+
+
+def _default_jsonl_path():
+    """Return absolute path to ball_on_ramp/datasets/ramp_temporal.jsonl."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    # Path is ball_on_ramp/datasets/ramp_temporal.jsonl (same dir as this file)
+    return os.path.join(here, "datasets", "ramp_temporal.jsonl")
+
+
+def _load_jsonl(path=None):
     """
-    frames: list of np.darray objects
-    path: output mp4 filename
-    """
-    imageio.mimsave(path, frames, fps=fps, codec="libx264")
-    print(f"Save file at {path}")
-
-def add_box_on_ramp(space: pymunk.Space, s1: pymunk.Segment, 
-        s2: pymunk.Segment, t: float, size=(50, 50), 
-        friction=0.9, elasticity=0.05):
-    """ Add box on a ramp
-    """
-    s1_a, s1_b = s1.a, s1.b
-    s2_a, s2_b = s2.a, s2.b
-    x = s1_a[0] + t * (s2_b[0] - s1_a[0])
-    if x <= s1_b[0]:
-        angle = math.atan2(s1_b[1] - s1_a[1], s1_b[0] - s1_a[0])
-        y = s1_a[1] + t * (s1_b[1] - s1_a[1])
-    else:
-        angle = 0 # at the ground
-        y = 0 + size[1] / 2 # box size y-offset
-
-    box_body = pymunk.Body(body_type=pymunk.Body.STATIC)
-    box_body.position = x, y
-    box_body.angle = angle
-
-    box_shape = pymunk.Poly.create_box(box_body, size)
-    box_shape.friction = friction
-    box_shape.elasticity = elasticity
-
-    space.add(box_body, box_shape)
-    return (box_body, box_shape)
-
-def render(space: pymunk.Space,
-           size=(640, 480),
-           xlim=(0, 640),
-           ylim=(-10, 480)) -> np.ndarray:
-    """
-    Render the current Pymunk space to an RGB numpy array.
-    Works on a headless machine because it uses matplotlib's Agg backend.
-    """
-    import matplotlib
-    matplotlib.use("Agg")  # force non-interactive backend
-    import matplotlib.pyplot as plt
-    from pymunk.matplotlib_util import DrawOptions
-
-    # Create off-screen figure
-    dpi = 100
-    fig_w = size[0] / dpi
-    fig_h = size[1] / dpi
-    fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=dpi)
-
-    ax.set_xlim(*xlim)
-    ax.set_ylim(*ylim)
-    ax.set_aspect("equal")
-    # Optional: invert y so it matches typical screen coordinates
-    #ax.invert_yaxis()
-    ax.axis("off")
-    plt.subplots_adjust(
-        left=0, right=1, bottom=0, top=1,
-        wspace=0, hspace=0
-    )
-    fig.patch.set_alpha(0.0)      # Remove fig background (optional)
-    ax.margins(0)
-
-    options = DrawOptions(ax)
-    space.debug_draw(options)
-
-    # Draw and grab the pixel buffer
-    fig.canvas.draw()
-    w, h = fig.canvas.get_width_height()
-    buf = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-    img = buf.reshape((h, w, 3))
-
-    plt.close(fig)
-    return img
-
-def create_env(config_filepath, args):
-    # Load config
-    with open(config_filepath, "r") as file:
-        config = yaml.safe_load(file)
-
-    space = pymunk.Space()
-    space.gravity = 0, -981 # y-direction
-    r_segment = pymunk.Segment(space.static_body, 
-            config["ramp_segment"]["a"], 
-            config["ramp_segment"]["b"], 
-            config["ramp_segment"]["radius"]
-            )
-
-    # Set up segment
-    r_segment.elasticity = config["ramp_segment"]["elasticity"]
-    r_segment.friction = config["ramp_segment"]["friction"]
-
-    h_segment = pymunk.Segment(space.static_body, 
-        config["horizontal_segment"]["a"], 
-        config["horizontal_segment"]["b"], 
-        config["horizontal_segment"]["radius"]
-        )
-
-    # Set up segment
-    h_segment.elasticity = config["horizontal_segment"]["elasticity"]
-    h_segment.friction = config["horizontal_segment"]["friction"]
-
-    # Set up circle
-    body = pymunk.Body(mass=config["ball"]["mass"], 
-                       moment=config["ball"]["moment"])
-    body.position = config["ball"]["position"]
-    circle = pymunk.Circle(body, radius=config["ball"]["radius"])
-    circle.elasticity = config["ball"]["elasticity"]
-    circle.friction = config["ball"]["friction"]
-    space.add(body, circle, r_segment, h_segment)
-    box_body, box_shape = add_box_on_ramp(space, r_segment, h_segment, args.box_position)
-    return space, body, box_body
-
-def get_sim_info(box_pos, trace_len=10, num_examples=50):
-    """
-    Input: box_pos: float(0, 1), trace_len: int, num_examples: int
-    Output: List([(pos_x: [float], pos_y[float], obstacle_x: float, obstacle_y: float), out: move_x: bool, move_y: bool])
+    Load ramp_temporal.jsonl and group records by meta.t.
+    Each record is exactly what get_ball_jsonl.py writes.
     
+    NOTE: Cache disabled for debugging to ensure fresh data on each run.
     """
-    raise NotImplementedError
+    # global _JSONL_CACHE
+    # if _JSONL_CACHE is not None:
+    #     return _JSONL_CACHE
 
-def simulate_env(space, body, args):
-    dt = args.dt
-    simulation_time = args.simulation_time
-    num_steps = int(simulation_time / dt)
-    frames = []
-    ball_position = []
-    print("Starting Pymunk simulation")
+    if path is None:
+        path = _default_jsonl_path()
 
-    for i in range(num_steps):
-        space.step(dt)
-        frames.append(render(space))
-        ball_position.append((body.position[0], body.position[1]))
-    return ball_position, frames
+    by_t = defaultdict(list)
+    with open(path, "r") as f:
+        for line in f:
+            rec = json.loads(line)
+            t = float(rec["meta"]["t"])
+            by_t[t].append(rec)
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Parser for ball on ramp')
-    parser.add_argument("--box_position", help="The x ratio position of the box obstacle", type=float, default=0.5)
-    parser.add_argument("--simulation_time", help="Simulation time for pymunk (in second)", type=float, default=2.0)
-    parser.add_argument("--config_filepath", help="Path to config file", type=str, default="config.yaml")
-    parser.add_argument("--dt", help="dt for simulation", type=float, default=0.02)
-    parser.add_argument("--save_folder", help="Save folder for video and results", type=str, default="results")
-    parser.add_argument("--save_video", help="Whether to save video", type=bool, default=True)
+    # _JSONL_CACHE = by_t
+    return by_t
 
-    args = parser.parse_args()
-    space, body, box_body = create_env(args.config_filepath, args)
-    ball_positions, frames = simulate_env(space, body, args)
-    timestamp = datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
-    save_folder = args.save_folder
-    if args.save_video:
-        if not os.path.exists(save_folder):
-            os.makedirs(save_folder, exist_ok=True)
-        save_filename = os.path.join(save_folder, f"ball_on_ramp_{timestamp}.mp4")
-        save_video(frames, save_filename, fps=int(1/args.dt))
-    
-    res = {
-        "ball_position": ball_positions,
-        "box_position": (box_body.position[0], box_body.position[1])
-    }
-    res_filename = os.path.join(save_folder, f"ball_on_ramp_{timestamp}.pkl")
-    with open(res_filename, "wb") as file:
-        pickle.dump(res, file)
-    print(f"Save result to {res_filename}")
+
+def get_sim_info(box_pos, jsonl_path=None, tol=1e-6):
+    """
+    Mimics the old API used by main.py:
+      get_sim_info(box_pos) -> list of dicts with keys:
+        "ball_x", "ball_y", "obstacle_x", "obstacle_y",
+        "move_x", "move_y"
+
+    Implemented by reading ramp_temporal.jsonl generated by get_ball_jsonl.py
+    and filtering windows whose meta.t matches box_pos (within tol).
+    """
+    by_t = _load_jsonl(jsonl_path)
+
+    matched_records = None
+    for t_val, recs in by_t.items():
+        if abs(t_val - box_pos) < tol:
+            matched_records = recs
+            break
+
+    if matched_records is None:
+        # No data for this specific t; return empty list
+        return []
+
+    examples = []
+    for rec in matched_records:
+        xs = rec["pos_x"]
+        ys_raw = rec["pos_y"]
+        obx = float(rec["obstacle_x"][0])
+        oby_raw = float(rec["obstacle_y"][0])
+
+        # Flip Y coordinates to match dummy data convention:
+        # Pymunk: Y increases upward (ball at ~150, obstacle at ~88)
+        # Dummy: Y decreases downward (ball starts at 25, goes to 0)
+        # Flip: y_flipped = max_y - y
+        max_y = 200.0  # Approximate max Y in our sim
+        ys = [max_y - y for y in ys_raw]
+        oby = max_y - oby_raw
+
+        move_x = bool(rec["out"]["move_x"])
+        move_y = bool(rec["out"]["move_y"])
+
+        examples.append({
+            "ball_x": xs,
+            "ball_y": ys,
+            "obstacle_x": obx,
+            "obstacle_y": oby,
+            "move_x": move_x,
+            "move_y": move_y,
+        })
+
+    return examples
+
+
+def get_available_positions(jsonl_path=None):
+    """
+    Return the sorted list of obstacle positions (meta.t) present in the JSONL.
+    """
+    by_t = _load_jsonl(jsonl_path)
+    return sorted(by_t.keys())

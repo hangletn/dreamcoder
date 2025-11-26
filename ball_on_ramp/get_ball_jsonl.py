@@ -43,7 +43,7 @@ def get_box_leftmost_corners(box_body: pymunk.Body, box_size: tuple):
     top_left = rotate_point(*top_left_local)
     return bottom_left, top_left
 
-def add_box_on_ramp(space: pymunk.Space, ramp: pymunk.Segment, ground: pymunk.Segment, t: float, size=(50.0, 50.0), friction=0.9, elasticity=0.05):
+def add_box_on_ramp(space: pymunk.Space, ramp: pymunk.Segment, ground: pymunk.Segment, t: float, size=(50.0, 50.0), friction=0.9, elasticity=0.00):
     ramp_a = ramp.a
     ramp_b = ramp.b
     ground_b = ground.b
@@ -95,7 +95,7 @@ def create_env(config_filepath: str, box_t: float, jitter_px: float = 0.0, seed=
         by += np.random.uniform(-jitter_px, jitter_px)
     body.position = (bx, by)
     circle = pymunk.Circle(body, radius=ball["radius"])
-    circle.elasticity = ball["elasticity"]
+    circle.elasticity = 0.0#ball["elasticity"]
     circle.friction = ball["friction"]
     space.add(body, circle, r_seg, g_seg)
     box_cfg = cfg["box"]
@@ -146,22 +146,40 @@ def simulate_positions(space: pymunk.Space, body: pymunk.Body, dt: float, steps:
         return xs, ys, frames
     return xs, ys
 
-def make_windows(xs, ys, h):
+def make_windows(xs, ys, h, stride=2):
+    """
+    Create sliding windows matching bin/ball_on_ramp.py dummy data:
+    - Windows of length h (we store h points, not h+1)
+    - Stride of 2 (every 2nd window, like dummy data)
+    - Label is about the NEXT step after window
+    """
     out = []
     n = len(xs)
-    for i in range(0, n - h - 1):
-        xw = xs[i:i + h + 1]
-        yw = ys[i:i + h + 1]
-        x_next = xs[i + h + 1]
-        y_next = ys[i + h + 1]
+    # Match dummy: range(0, seq_len-trace_len-1, 2)
+    # We need h points + 1 for next step label
+    for i in range(0, n - h, stride):
+        xw = xs[i:i + h]  # h points (not h+1)
+        yw = ys[i:i + h]
+        x_next = xs[i + h]  # next step for label
+        y_next = ys[i + h]
         out.append((i, xw, yw, x_next, y_next))
     return out
 
 def next_step_bools(xw, yw, x_next, y_next, eps=1e-3):
+    """
+    Label matches bin/ball_on_ramp.py dummy data:
+    - move_x/y are about the NEXT step (after the window ends)
+    - Checks if position changes between last point in window and next point
+    
+    This is what the dummy data does and what gets hits.
+    """
+    # Check if next step differs from last point in window (like dummy data)
     dx = x_next - xw[-1]
     dy = y_next - yw[-1]
+    
     move_x = abs(dx) > eps
     move_y = abs(dy) > eps
+    
     still_x = not move_x
     still_y = not move_y
     return {"move_x": bool(move_x), "still_x": bool(still_x), "move_y": bool(move_y), "still_y": bool(still_y)}
