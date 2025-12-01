@@ -1,0 +1,13 @@
+[submodule "pyccg"]
+	path = pyccg
+	url = https://github.com/hans/pyccg
+	shallow = true
+	branch = master
+[submodule "pinn"]
+	path = pinn
+	shallow = true
+	url = https://github.com/insperatum/pinn
+[submodule "pregex"]
+	path = pregex
+	shallow = true
+	url = https://github.com/insperatum/pregex
