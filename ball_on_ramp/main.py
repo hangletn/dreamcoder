@@ -239,7 +239,6 @@ if __name__ == "__main__":
     
     MAX_TRAIN_POSITIONS = 6
     MAX_TEST_POSITIONS = 2
-    MAX_EXAMPLES_PER_TASK = 100
     
     if len(available_positions) <= MAX_TRAIN_POSITIONS:
         box_ratios_train = available_positions
@@ -255,21 +254,20 @@ if __name__ == "__main__":
     print(f"Available positions: {available_positions}")
     print(f"Training positions: {box_ratios_train} ({len(box_ratios_train)} positions × 2 tasks = {len(box_ratios_train)*2} tasks)")
     print(f"Testing positions: {box_ratios_test} ({len(box_ratios_test)} positions × 2 tasks = {len(box_ratios_test)*2} tasks)")
-    print(f"Max examples per task: {MAX_EXAMPLES_PER_TASK}")
+    print(f"Using ENTIRE dataset - all examples from all rollouts (no sampling)")
     print(f"Max training positions: {MAX_TRAIN_POSITIONS} (actual: {len(box_ratios_train)})")
     print(f"Max testing positions: {MAX_TEST_POSITIONS} (actual: {len(box_ratios_test)})")
 
-    def make_examples(positions, max_examples_per_task=40):
+    def make_examples(positions):
         """
         Create tasks with examples from JSONL data.
         
-        NOTE: This controls how many examples each TASK gets (for evaluation).
+        Uses the ENTIRE dataset - all examples from all rollouts for each position.
         The feature extractor may subsample to 32 examples for CNN encoding efficiency,
         but that's only for feature computation, not task evaluation.
         
         Args:
             positions: List of obstacle positions
-            max_examples_per_task: Maximum number of examples per task
         """
         tasks = []
         for box_pos in positions:
@@ -277,63 +275,20 @@ if __name__ == "__main__":
             if not examples:
                 continue
             
-            simplified_examples = []
-            true_x_examples = [ex for ex in examples if ex["move_x"]]
-            false_x_examples = [ex for ex in examples if not ex["move_x"]]
-            true_y_examples = [ex for ex in examples if ex["move_y"]]
-            false_y_examples = [ex for ex in examples if not ex["move_y"]]
-            
-            if true_x_examples and false_x_examples and true_y_examples and false_y_examples:
-                # Try to get examples covering all 4 combinations: (move_x, move_y)
-                # (True, True), (True, False), (False, True), (False, False)
-                combinations = [
-                    (True, True), (True, False), (False, True), (False, False)
-                ]
-                for move_x_val, move_y_val in combinations:
-                    matching = [ex for ex in examples 
-                               if ex["move_x"] == move_x_val and ex["move_y"] == move_y_val]
-                    if matching and len(simplified_examples) < max_examples_per_task:
-                        simplified_examples.append(matching[0])
-                
-                if len(simplified_examples) < max_examples_per_task:
-                    remaining = [ex for ex in examples if ex not in simplified_examples]
-                    for ex in remaining:
-                        if len(simplified_examples) >= max_examples_per_task:
-                            break
-                        current_x_vals = [e["move_x"] for e in simplified_examples]
-                        current_y_vals = [e["move_y"] for e in simplified_examples]
-                        adds_diversity = (ex["move_x"] not in current_x_vals or 
-                                         ex["move_y"] not in current_y_vals)
-                        if adds_diversity or len(simplified_examples) < 4:
-                            simplified_examples.append(ex)
-            elif true_x_examples and false_x_examples:
-                simplified_examples.append(true_x_examples[0])
-                simplified_examples.append(false_x_examples[0])
-                if len(simplified_examples) < max_examples_per_task:
-                    remaining = [ex for ex in examples if ex not in simplified_examples]
-                    simplified_examples.extend(remaining[:max_examples_per_task - len(simplified_examples)])
-            elif true_y_examples and false_y_examples:
-                simplified_examples.append(true_y_examples[0])
-                simplified_examples.append(false_y_examples[0])
-                if len(simplified_examples) < max_examples_per_task:
-                    remaining = [ex for ex in examples if ex not in simplified_examples]
-                    simplified_examples.extend(remaining[:max_examples_per_task - len(simplified_examples)])
-            else:
-                simplified_examples = examples[:max_examples_per_task]
-            
-            if simplified_examples:
-                move_x_vals = [ex["move_x"] for ex in simplified_examples]
-                move_y_vals = [ex["move_y"] for ex in simplified_examples]
+            # Use ALL examples - no sampling
+            if examples:
+                move_x_vals = [ex["move_x"] for ex in examples]
+                move_y_vals = [ex["move_y"] for ex in examples]
                 if len(set(move_x_vals)) == 1:
-                    print(f"Warning NIT: All {len(simplified_examples)} examples for {box_pos} have move_x={move_x_vals[0]} (task will be easier)")
+                    print(f"Warning: All {len(examples)} examples for {box_pos} have move_x={move_x_vals[0]} (task will be easier)")
                 if len(set(move_y_vals)) == 1:
-                    print(f"Warning NIT: All {len(simplified_examples)} examples for {box_pos} have move_y={move_y_vals[0]} (task will be easier)")
+                    print(f"Warning: All {len(examples)} examples for {box_pos} have move_y={move_y_vals[0]} (task will be easier)")
             
-            tasks.append({"name": f"box_pos_{box_pos:.3f}", "examples": simplified_examples})
+            tasks.append({"name": f"box_pos_{box_pos:.3f}", "examples": examples})
         return tasks
 
-    training_examples = make_examples(box_ratios_train, max_examples_per_task=MAX_EXAMPLES_PER_TASK)
-    testing_examples = make_examples(box_ratios_test, max_examples_per_task=MAX_EXAMPLES_PER_TASK)
+    training_examples = make_examples(box_ratios_train)
+    testing_examples = make_examples(box_ratios_test)
 
     training = (
         [get_ball_on_ramp_task(item, move="x") for item in training_examples]
