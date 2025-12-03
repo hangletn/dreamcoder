@@ -13,6 +13,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from pymunk.matplotlib_util import DrawOptions
 
+GROUND_OFFSET = 1.5
+
 def set_seed(s: int):
     random.seed(s)
     np.random.seed(s)
@@ -155,7 +157,8 @@ def simulate_positions(space: pymunk.Space, body: pymunk.Body, dt: float, steps:
             space.step(dt)
             current_x = float(body.position.x)
             current_y = float(body.position.y)
-            if current_y - ball_radius > 0.01:
+
+            if current_y - ball_radius > GROUND_OFFSET:
                 if collision_threshold is not None and current_x >= collision_threshold_ramp:
                     hit_obstacle = True
                     current_x = collision_threshold_ramp
@@ -164,7 +167,7 @@ def simulate_positions(space: pymunk.Space, body: pymunk.Body, dt: float, steps:
                 if collision_threshold is not None and current_x >= collision_threshold:
                     hit_obstacle = True
                     current_x = collision_threshold
-                    current_y = obstacle_y - ball_radius
+                    current_y = obstacle_y - np.sin(0.0)*ball_radius
             
             xs.append(current_x)
             ys.append(current_y)
@@ -300,16 +303,16 @@ def main():
                         y_next = round(y_next, args.round_decimals)
                     add_radius = True
                     if add_radius:
-                        not_on_ramp = np.array([True if (y - params["ball_radius"]/2 < 0.01) else False for y in yw])
+                        on_ramp = np.array([True if (y - params["ball_radius"] < GROUND_OFFSET) else False for y in yw])
                         theta_array = np.zeros(len(xw)) + params["ramp_theta"]
-                        theta_array[not_on_ramp] = 0.0
+                        theta_array[on_ramp] = 0.0
                         xw += np.cos(theta_array)*params["ball_radius"]
                         yw += np.sin(theta_array)*params["ball_radius"]
                         xw = [round(x, args.round_decimals) for x in xw]
                         yw = [round(y, args.round_decimals) for y in yw]
                         
-                        not_on_ramp_next = y_next - params["ball_radius"]/2 < 0.01
-                        theta_next = 0.0 if not_on_ramp_next else params["ramp_theta"]
+                        on_ramp_next = (y_next - params["ball_radius"]) < GROUND_OFFSET
+                        theta_next = 0.0 if on_ramp_next else params["ramp_theta"]
                         x_next += np.cos(theta_next) * params["ball_radius"]
                         y_next += np.sin(theta_next) * params["ball_radius"]
                         if args.round_decimals is not None:
