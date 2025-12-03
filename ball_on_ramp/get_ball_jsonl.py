@@ -1,4 +1,3 @@
-
 import argparse
 import json
 import math
@@ -13,7 +12,6 @@ import matplotlib
 matplotlib.use("Agg") 
 import matplotlib.pyplot as plt
 from pymunk.matplotlib_util import DrawOptions
-
 
 def set_seed(s: int):
     random.seed(s)
@@ -43,7 +41,7 @@ def get_box_leftmost_corners(box_body: pymunk.Body, box_size: tuple):
     top_left = rotate_point(*top_left_local)
     return bottom_left, top_left
 
-def add_box_on_ramp(space: pymunk.Space, ramp: pymunk.Segment, ground: pymunk.Segment, t: float, size=(50.0, 50.0), friction=0.9, elasticity=0.05):
+def add_box_on_ramp(space: pymunk.Space, ramp: pymunk.Segment, ground: pymunk.Segment, t: float, size=(50.0, 50.0), friction=0.9, elasticity=0.00):
     ramp_a = ramp.a
     ramp_b = ramp.b
     ground_b = ground.b
@@ -100,7 +98,7 @@ def create_env(config_filepath: str, box_t: float, jitter_px: float = 0.0, seed=
     space.add(body, circle, r_seg, g_seg)
     box_cfg = cfg["box"]
     box_size = tuple(box_cfg["size"])
-    box_elasticity = 0.0
+    box_elasticity = box_cfg["elasticity"]
     box_body, _ = add_box_on_ramp(space, r_seg, g_seg, box_t, size=box_size, friction=box_cfg.get("friction", 0.9), elasticity=box_elasticity)
     ramp_theta = ramp_point_and_angle(r_seg, 0.5)[1]
     bottom_left, top_left = get_box_leftmost_corners(box_body, box_size)
@@ -133,35 +131,97 @@ def save_video(frames: list, path: str, fps=60):
     imageio.mimsave(path, frames, fps=fps, codec="libx264")
     print(f"Saved video at {path}")
 
-def simulate_positions(space: pymunk.Space, body: pymunk.Body, dt: float, steps: int, capture_frames: bool = False, size=(640, 480), xlim=(0, 640), ylim=(-10, 480)):
+def simulate_positions(space: pymunk.Space, body: pymunk.Body, dt: float, steps: int, 
+                       obstacle_x: float = None, ball_radius: float = None, 
+                       capture_frames: bool = False, size=(640, 480), xlim=(0, 640), ylim=(-10, 480)):
+    """
+    Simulate ball movement, clipping position when it hits obstacle.
+    Like bin/ball_on_ramp.py, when ball hits obstacle, it stops and stays at that position.
+    """
     xs, ys = [], []
     frames = [] if capture_frames else None
+    collision_threshold = None
+    if obstacle_x is not None and ball_radius is not None:
+        collision_threshold = obstacle_x - ball_radius
+    
+    hit_obstacle = False
+    last_x, last_y = float(body.position.x), float(body.position.y)
+    
     for _ in range(steps):
-        space.step(dt)
-        xs.append(float(body.position.x))
-        ys.append(float(body.position.y))
+        if not hit_obstacle:
+            space.step(dt)
+            current_x = float(body.position.x)
+            current_y = float(body.position.y)
+            
+            if collision_threshold is not None and current_x >= collision_threshold:
+                hit_obstacle = True
+                current_x = collision_threshold
+            
+            xs.append(current_x)
+            ys.append(current_y)
+            last_x, last_y = current_x, current_y
+        else:
+            xs.append(last_x)
+            ys.append(last_y)
+        
         if capture_frames:
             frames.append(render(space, size=size, xlim=xlim, ylim=ylim))
+    
     if capture_frames:
         return xs, ys, frames
     return xs, ys
 
-def make_windows(xs, ys, h):
+def make_windows(xs, ys, h, stride=2):
+    """
+    Create sliding windows matching bin/ball_on_ramp.py:
+    - Windows of length h
+    - Stride of 2 (every 2nd window, like dummy data)
+    - Returns (start_idx, xw, yw, x_next, y_next) where next is the step after window
+    - Matches: range(0, seq_len-trace_len-1, 2) and end_idx = start_idx + trace_len
+    """
     out = []
     n = len(xs)
-    for i in range(0, n - h - 1):
-        xw = xs[i:i + h + 1]
-        yw = ys[i:i + h + 1]
-        x_next = xs[i + h + 1]
-        y_next = ys[i + h + 1]
+    for i in range(0, n - h - 1, stride):
+        xw = xs[i:i + h]
+        yw = ys[i:i + h]
+        x_next = xs[i + h] if i + h < n else xs[-1]
+        y_next = ys[i + h] if i + h < n else ys[-1]
         out.append((i, xw, yw, x_next, y_next))
     return out
 
+def window_internal_bools(xw, yw, eps=1e-3, use_exact_equality=False):
+    """
+    Check if ball moved WITHIN the window.
+    
+    Args:
+        xw: list of x positions in window
+        yw: list of y positions in window
+        eps: tolerance for floating point comparison
+        use_exact_equality: if True, use exact equality (==) instead of eps threshold
+    """
+    if use_exact_equality:
+        move_x = any(xw[i] != xw[i+1] for i in range(len(xw)-1))
+        move_y = any(yw[i] != yw[i+1] for i in range(len(yw)-1))
+    else:
+        move_x = any(abs(xw[i+1] - xw[i]) > eps for i in range(len(xw)-1))
+        move_y = any(abs(yw[i+1] - yw[i]) > eps for i in range(len(yw)-1))
+    return {"move_x": bool(move_x), "still_x": bool(not move_x), "move_y": bool(move_y), "still_y": bool(not move_y)}
+
+
 def next_step_bools(xw, yw, x_next, y_next, eps=1e-3):
+    """
+    Label matches bin/ball_on_ramp.py dummy data:
+    - move_x/y are about the NEXT step (after the window ends)
+    - Checks if position changes between last point in window and next point
+    
+    This is what the dummy data does and what gets hits.
+    """
     dx = x_next - xw[-1]
     dy = y_next - yw[-1]
+    
     move_x = abs(dx) > eps
     move_y = abs(dy) > eps
+    
     still_x = not move_x
     still_y = not move_y
     return {"move_x": bool(move_x), "still_x": bool(still_x), "move_y": bool(move_y), "still_y": bool(still_y)}
@@ -176,6 +236,8 @@ def main():
     ap.add_argument("--num_examples", type=int, default=50, help="rollouts per t")
     ap.add_argument("--window_h", type=int, default=10, help="window length h (we store h+1 points)")
     ap.add_argument("--eps", type=float, default=1e-3, help="tolerance for 'still' vs 'move' (position change threshold)")
+    ap.add_argument("--round_decimals", type=int, default=2, help="round positions and obstacle coordinates to N decimal places")
+    ap.add_argument("--use_exact_equality", action="store_true", help="use exact equality (==) for label generation instead of eps threshold")
     ap.add_argument("--jitter_px", type=float, default=2.0, help="random start jitter for the ball")
     ap.add_argument("--seed", type=int, default=123)
     ap.add_argument("--out_jsonl", type=str, default="datasets/ramp_temporal.jsonl")
@@ -200,15 +262,57 @@ def main():
                 seed_e = (hash((round(t, 3), e, args.seed)) & 0xFFFFFFFF)
                 space, body, params = create_env(args.config_filepath, box_t=t, jitter_px=args.jitter_px, seed=seed_e)
                 capture_video = args.save_video and videos_recorded < args.videos_per_position
+                obstacle_x = (params["obstacle_bottom_left_x"] + params["obstacle_top_left_x"]) / 2.0  
+                obstacle_y = (params["obstacle_bottom_left_y"] + params["obstacle_top_left_y"]) / 2.0 
+                
                 if capture_video:
-                    xs, ys, frames = simulate_positions(space, body, args.dt, steps_total, capture_frames=True)
+                    xs, ys, frames = simulate_positions(space, body, args.dt, steps_total, 
+                                                       obstacle_x=obstacle_x, 
+                                                       ball_radius=params["ball_radius"],
+                                                       capture_frames=True)
                     videos_recorded += 1
                 else:
-                    xs, ys = simulate_positions(space, body, args.dt, steps_total)
+                    xs, ys = simulate_positions(space, body, args.dt, steps_total,
+                                               obstacle_x=obstacle_x,
+                                               ball_radius=params["ball_radius"])
                     frames = None
+                
+                if args.round_decimals is not None:
+                    obstacle_x = round(obstacle_x, args.round_decimals)
+                    obstacle_y = round(obstacle_y, args.round_decimals)
+                
                 for start_i, xw, yw, x_next, y_next in make_windows(xs, ys, args.window_h):
+                    if args.round_decimals is not None:
+                        xw = [round(x, args.round_decimals) for x in xw]
+                        yw = [round(y, args.round_decimals) for y in yw]
+                        x_next = round(x_next, args.round_decimals)
+                        y_next = round(y_next, args.round_decimals)
+                    
                     labels = next_step_bools(xw, yw, x_next, y_next, eps=args.eps)
-                    record = {"pos_x": xw, "pos_y": yw, "obstacle_x": [params["obstacle_bottom_left_x"], params["obstacle_top_left_x"]], "obstacle_y": [params["obstacle_bottom_left_y"], params["obstacle_top_left_y"]], "out": {"move_x": labels["move_x"], "move_y": labels["move_y"]}, "meta": {"t": t, "dt": args.dt, "start_index": start_i, "h": args.window_h, "sim_steps": steps_total, "example_id": e}}
+                    
+                    all_labels = {
+                        "move_x": labels["move_x"],
+                        "move_y": labels["move_y"],
+                    }
+                    
+                    record = {
+                        "pos_x": xw,
+                        "pos_y": yw,
+                        "obstacle_x": obstacle_x,
+                        "obstacle_y": obstacle_y,
+                        "out": all_labels,
+                        "meta": {
+                            "t": t,
+                            "dt": args.dt,
+                            "start_index": start_i,
+                            "h": args.window_h,
+                            "sim_steps": steps_total,
+                            "example_id": e,
+                            "ball_radius": params["ball_radius"],
+                            "box_size": params["box_size"],
+                            "ramp_theta": params["ramp_theta"]
+                        }
+                    }
                     wf.write(json.dumps(record) + "\n")
                     n_written += 1
                 if frames is not None:
