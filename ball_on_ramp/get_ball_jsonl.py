@@ -132,6 +132,7 @@ def save_video(frames: list, path: str, fps=60):
     print(f"Saved video at {path}")
 
 def simulate_positions(space: pymunk.Space, body: pymunk.Body, dt: float, steps: int, 
+                        ramp_theta, obstacle_y: float = None,
                        obstacle_x: float = None, ball_radius: float = None, 
                        capture_frames: bool = False, size=(640, 480), xlim=(0, 640), ylim=(-10, 480)):
     """
@@ -141,8 +142,10 @@ def simulate_positions(space: pymunk.Space, body: pymunk.Body, dt: float, steps:
     xs, ys = [], []
     frames = [] if capture_frames else None
     collision_threshold = None
+    collision_threshold_ramp = None
     if obstacle_x is not None and ball_radius is not None:
         collision_threshold = obstacle_x - ball_radius
+        collision_threshold_ramp = obstacle_x - np.cos(ramp_theta)*ball_radius
     
     hit_obstacle = False
     last_x, last_y = float(body.position.x), float(body.position.y)
@@ -152,10 +155,16 @@ def simulate_positions(space: pymunk.Space, body: pymunk.Body, dt: float, steps:
             space.step(dt)
             current_x = float(body.position.x)
             current_y = float(body.position.y)
-            
-            if collision_threshold is not None and current_x >= collision_threshold:
-                hit_obstacle = True
-                current_x = collision_threshold
+            if current_y - ball_radius > 0.01:
+                if collision_threshold is not None and current_x >= collision_threshold_ramp:
+                    hit_obstacle = True
+                    current_x = collision_threshold_ramp
+                    current_y = obstacle_y - np.sin(ramp_theta)*ball_radius
+            else:
+                if collision_threshold is not None and current_x >= collision_threshold:
+                    hit_obstacle = True
+                    current_x = collision_threshold
+                    current_y = obstacle_y - ball_radius
             
             xs.append(current_x)
             ys.append(current_y)
@@ -233,7 +242,7 @@ def main():
     ap.add_argument("--dt", type=float, default=0.02, help="simulation time step")
     ap.add_argument("--simulation_time", type=float, default=2.0, help="total simulated seconds")
     ap.add_argument("--positions", type=str, default="0.5", help="comma-separated t values (0..1) for obstacle placement along ramp")
-    ap.add_argument("--num_examples", type=int, default=50, help="rollouts per t")
+    ap.add_argument("--num_examples", type=int, default=1, help="rollouts per t")
     ap.add_argument("--window_h", type=int, default=10, help="window length h (we store h+1 points)")
     ap.add_argument("--eps", type=float, default=1e-3, help="tolerance for 'still' vs 'move' (position change threshold)")
     ap.add_argument("--round_decimals", type=int, default=2, help="round positions and obstacle coordinates to N decimal places")
@@ -266,7 +275,8 @@ def main():
                 obstacle_y = (params["obstacle_bottom_left_y"] + params["obstacle_top_left_y"]) / 2.0 
                 
                 if capture_video:
-                    xs, ys, frames = simulate_positions(space, body, args.dt, steps_total, 
+                    xs, ys, frames = simulate_positions(space, body, args.dt, steps_total,
+                                                        params["ramp_theta"], obstacle_y=obstacle_y,
                                                        obstacle_x=obstacle_x, 
                                                        ball_radius=params["ball_radius"],
                                                        capture_frames=True)
@@ -287,6 +297,15 @@ def main():
                         yw = [round(y, args.round_decimals) for y in yw]
                         x_next = round(x_next, args.round_decimals)
                         y_next = round(y_next, args.round_decimals)
+                    add_radius = True
+                    if add_radius:
+                        not_on_ramp = np.array([True if (y - params["ball_radius"]/2 < 0.01) else False for y in yw])
+                        theta_array = np.zeros(len(xw)) + params["ramp_theta"]
+                        theta_array[not_on_ramp] = 0.0
+                        xw += np.cos(theta_array)*params["ball_radius"]
+                        yw += np.sin(theta_array)*params["ball_radius"]
+                        xw = [round(x, args.round_decimals) for x in xw]
+                        yw = [round(y, args.round_decimals) for y in yw]
                     
                     labels = next_step_bools(xw, yw, x_next, y_next, eps=args.eps)
                     
