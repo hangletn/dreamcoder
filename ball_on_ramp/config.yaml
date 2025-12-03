@@ -18,7 +18,7 @@ ball:
   position: [50, 150]
   elasticity: 0.5
   friction: 0.5
-  radius: 20.0
+  radius: 25.0
 
 box:
   size: [50, 50]

@@ -1,0 +1,374 @@
+DEPRECATION NOTICE: this module (dreamcoder.ec) will be deleted soon, please update your code to import from dreamcoder.dreamcoder instead
+pygame 1.9.6
+Hello from the pygame community. https://www.pygame.org/contribute.html
+CUDA is available?: True
+using cuda?: False
+Available positions: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+Training positions: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6] (6 positions)
+Testing positions: [0.7, 0.8] (2 positions)
+Creating 2 tasks (move_x, move_y) with examples from ALL positions combined
+Max training positions: 6 (actual: 6)
+Max testing positions: 2 (actual: 2)
+Combined training examples: 267 for move_x, 267 for move_y
+Combined testing examples: 88 for move_x, 88 for move_y
+Failure to load pregex. This is only acceptable if using pypy
+Failure to load pregex. This is only acceptable if using pypy
+Warning: Recognition model needs feature extractor. Ignoring recognition model.
+Running EC on ydu-Lambda-Vector @ 2025-12-03 01:15:16.544524 with 64 CPUs and parameters:
+	 noConsolidation  =  False
+	 iterations  =  3
+	 enumerationTimeout  =  10
+	 useRecognitionModel  =  False
+	 topk_use_only_likelihood  =  False
+	 pseudoCounts  =  30.0
+	 aic  =  1.0
+	 structurePenalty  =  1.0
+	 arity  =  3
+	 taskReranker  =  default
+	 storeTaskMetrics  =  True
+	 rewriteTaskMetrics  =  False
+	 maximumFrontier  =  10
+	 solver  =  ocaml
+	 topK  =  2
+	 evaluationTimeout  =  1.0
+	 cuda  =  False
+
+Currently using this much memory: 180817920
+Currently using this much memory: 180817920
+Using a waking task batch of size: 2
+Disabling parallelism on the Python side because we only have one job.
+If you are using ocaml or bottom, there could still be parallelism.
+(frontend) Launching list(real) -> list(real) -> real -> real -> bool (2 tasks) w/ 64 CPUs. 0.000000 <= MDL < 1.500000. Timeout 10.000000.
+	(ocaml: 64 CPUs. shatter: 640. |fringe| = 0. |finished| = 0.)
+(frontend) Launching list(real) -> list(real) -> real -> real -> bool (2 tasks) w/ 64 CPUs. 1.500000 <= MDL < 3.000000. Timeout 9.961495.
+	(ocaml: 64 CPUs. shatter: 640. |fringe| = 0. |finished| = 1.)
+(frontend) Launching list(real) -> list(real) -> real -> real -> bool (2 tasks) w/ 64 CPUs. 3.000000 <= MDL < 4.500000. Timeout 9.915649.
+	(ocaml: 64 CPUs. shatter: 640. |fringe| = 0. |finished| = 4.)
+(frontend) Launching list(real) -> list(real) -> real -> real -> bool (2 tasks) w/ 64 CPUs. 4.500000 <= MDL < 6.000000. Timeout 9.875656.
+	(ocaml: 64 CPUs. shatter: 640. |fringe| = 0. |finished| = 15.)
+(frontend) Launching list(real) -> list(real) -> real -> real -> bool (2 tasks) w/ 64 CPUs. 6.000000 <= MDL < 7.500000. Timeout 9.832503.
+	(ocaml: 64 CPUs. shatter: 640. |fringe| = 0. |finished| = 32.)
+(frontend) Launching list(real) -> list(real) -> real -> real -> bool (2 tasks) w/ 64 CPUs. 7.500000 <= MDL < 9.000000. Timeout 9.785415.
+	(ocaml: 64 CPUs. shatter: 640. |fringe| = 653. |finished| = 2.)
+(frontend) Launching list(real) -> list(real) -> real -> real -> bool (2 tasks) w/ 64 CPUs. 9.000000 <= MDL < 10.500000. Timeout 9.356569.
+	(ocaml: 64 CPUs. shatter: 640. |fringe| = 653. |finished| = 0.)
+(frontend) Launching list(real) -> list(real) -> real -> real -> bool (2 tasks) w/ 64 CPUs. 10.500000 <= MDL < 12.000000. Timeout 8.870511.
+	(ocaml: 64 CPUs. shatter: 640. |fringe| = 653. |finished| = 0.)
+(frontend) Launching list(real) -> list(real) -> real -> real -> bool (2 tasks) w/ 64 CPUs. 12.000000 <= MDL < 13.500000. Timeout 8.365729.
+	(ocaml: 64 CPUs. shatter: 640. |fringe| = 653. |finished| = 0.)
+(frontend) Launching list(real) -> list(real) -> real -> real -> bool (2 tasks) w/ 64 CPUs. 13.500000 <= MDL < 15.000000. Timeout 7.923873.
+	(ocaml: 64 CPUs. shatter: 640. |fringe| = 653. |finished| = 0.)
+We enumerated this many programs, for each task:
+	 [10243, 10243]
+Generative model enumeration results:
+HIT move_x_all_positions w/ (lambda (lambda (lambda (lambda (always (lambda (gt_real $0 $1)) $2))))) ; log prior = -11.079061 ; log likelihood = 0.000000
+HIT move_y_all_positions w/ (lambda (lambda (lambda (lambda (always (lambda (gt_real $0 $1)) $2))))) ; log prior = -11.079061 ; log likelihood = 0.000000
+Hits 2/2 tasks
+Average description length of a program solving a task: 11.079061 nats
+Generative model average:  1 sec.	median: 1 	max: 1 	standard deviation 0
+Currently using this much memory: 182546432
+Frontiers discovered top down: 2
+Total frontiers: 2
+Currently using this much memory: 182546432
+Showing the top 5 programs in each frontier being sent to the compressor:
+move_x_all_positions
+-1.06	(lambda (lambda (lambda (lambda (always (lambda (gt_real $0 $1)) $2)))))
+-1.06	(lambda (lambda (lambda (lambda (always (lambda (gt_real $2 $0)) $3)))))
+-2.45	(lambda (lambda (lambda (lambda (always (lambda (gt_real $0 $1)) (cdr $2))))))
+-2.45	(lambda (lambda (lambda (lambda (always (lambda (gt_real $2 $0)) (cdr $3))))))
+-3.77	(lambda (lambda (lambda (lambda (always (lambda (not (eq_real $0 $1))) $2)))))
+
+move_y_all_positions
+-1.06	(lambda (lambda (lambda (lambda (always (lambda (gt_real $0 $1)) $2)))))
+-1.06	(lambda (lambda (lambda (lambda (always (lambda (gt_real $2 $0)) $3)))))
+-2.45	(lambda (lambda (lambda (lambda (always (lambda (gt_real $0 $1)) (cdr $2))))))
+-2.45	(lambda (lambda (lambda (lambda (always (lambda (gt_real $2 $0)) (cdr $3))))))
+-3.77	(lambda (lambda (lambda (lambda (always (lambda (not (eq_real $0 $1))) $2)))))
+
+Compression message saved to: compressionMessages/2025-12-03T01:15:19.175831
+Compression backend will run for most 99 iterations
+Found 0 alignments; 
+Found 0 alignments; 
+Found 0 alignments; 
+Total number of candidates: 1228
+Constructed version spaces and coalesced candidates in 258.79192352294922ms.
+Trimmed down the beam, have only 297 best candidates
+Rewrote topK in 242.71631240844727ms.
+Initial score: -55.778221
+Initial language score: 0.000000
+Initial joint score: -55.778221 using LC of 0.000000
+Here in the master worker: we still have 0 language alignments;
+Scored candidates in 38.264036178588867ms.
+Best MDL score: -53.002043 with (lambda (always (lambda (gt_real $0 $1))))
+Scored candidates with language and grammar in 36.082744598388672ms.
+Best joint score: -53.002043 with (lambda (always (lambda (gt_real $0 $1))))
+Improved score to -53.002043 (dScore=2.776178) w/ new primitive
+	#(lambda (always (lambda (gt_real $0 $1)))) : real -> list(real) -> bool
+rewrote all of the frontiers in 2.1042485237121582s.
+Completed one step of memory consolidation in 2.7006542682647705s.
+New primitive is used 2 times in the best programs in each of the frontiers.
+Here is where it is used:
+  (lambda (lambda (lambda (lambda (#(lambda (always (lambda (gt_real $0 $1)))) $0 $2)))))
+  (lambda (lambda (lambda (lambda (#(lambda (always (lambda (gt_real $0 $1)))) $0 $2)))))
+Total number of candidates: 382
+Constructed version spaces and coalesced candidates in 189.24450874328613ms.
+Trimmed down the beam, have only 295 best candidates
+Rewrote topK in 77.0719051361084ms.
+Initial score: -52.567664
+Initial language score: 0.000000
+Initial joint score: -52.567664 using LC of 0.000000
+Here in the master worker: we still have 0 language alignments;
+Scored candidates in 35.767793655395508ms.
+Best MDL score: -56.688045 with (always ($0 gt_real))
+No improvement possible with MDL.
+Scored candidates with language and grammar in 27.74357795715332ms.
+Best joint score: -56.688045 with (always ($0 gt_real))
+No improvement possible with joint score.
+Completed one step of memory consolidation in 341.58968925476074ms.
+completed ocaml compression in 3.0451958179473877s.
+Finished consolidation.
+Induced a grammar in 3.1 seconds
+Grammar after iteration 1:
+-0.011772	t0	$_
+0.000000	bool -> bool -> pair(bool, bool)	pair
+-0.063710	list(t0) -> list(t0)	cdr
+-0.064680	(real -> bool) -> list(real) -> bool	always
+-0.064774	real -> real -> bool	gt_real
+-0.065104	bool -> bool	not
+-0.065104	real -> real -> bool	eq_real
+-0.065199	(real -> bool) -> list(real) -> bool	eventually
+-0.065246	bool	true
+-0.065246	bool -> bool -> bool	and
+-0.065246	bool -> bool -> bool	or
+-0.065246	real -> bool	eq0_real
+-0.065246	real -> bool	gt0_real
+-0.065246	(real -> bool) -> (real -> bool) -> list(real) -> bool	until
+-0.065246	pair(bool, bool) -> bool	pair_first
+-0.065246	pair(bool, bool) -> bool	pair_second
+-0.065246	list(t0) -> bool	empty?
+-0.077048	t0 -> list(t0) -> list(t0)	cons
+-0.194576	list(t0) -> t0	car
+-0.001283	real -> list(real) -> bool	#(lambda (always (lambda (gt_real $0 $1))))
+Currently using this much memory: 182546432
+Exported checkpoint to experimentOutputs/ball_on_ramp/2025-12-03T01:15:16.522383_aic=1.0_arity=3_ET=10_it=1_MF=10_noConsolidation=False_pc=30.0_RW=False_solver=ocaml_STM=True_L=1.0_TRR=default_K=2_topkNotMAP=False_rec=False.pickle
+WARNING: Do not have an English description of:
+ #(lambda (always (lambda (gt_real $0 $1))))
+
+Exporting primitive graph to experimentOutputs/ball_on_ramp/2025-12-03T01:15:16.522383_primitives_0_depth
+{#(lambda (always (lambda (gt_real $0 $1))))}
+digraph {
+	graph [rankdir=LR]
+	f0 [label=<f0=(λ (x) (always (λ (y) <br /> (gt_real y x))))>]
+}
+Exported primitive graph to experimentOutputs/ball_on_ramp/2025-12-03T01:15:16.522383_primitives_0_unordered
+ecIterator count 0
+Currently using this much memory: 182546432
+Currently using this much memory: 182546432
+Using a waking task batch of size: 2
+Disabling parallelism on the Python side because we only have one job.
+If you are using ocaml or bottom, there could still be parallelism.
+(frontend) Launching list(real) -> list(real) -> real -> real -> bool (2 tasks) w/ 64 CPUs. 0.000000 <= MDL < 1.500000. Timeout 10.000000.
+	(ocaml: 64 CPUs. shatter: 640. |fringe| = 0. |finished| = 0.)
+(frontend) Launching list(real) -> list(real) -> real -> real -> bool (2 tasks) w/ 64 CPUs. 1.500000 <= MDL < 3.000000. Timeout 9.949014.
+	(ocaml: 64 CPUs. shatter: 640. |fringe| = 0. |finished| = 1.)
+(frontend) Launching list(real) -> list(real) -> real -> real -> bool (2 tasks) w/ 64 CPUs. 3.000000 <= MDL < 4.500000. Timeout 9.904189.
+	(ocaml: 64 CPUs. shatter: 640. |fringe| = 0. |finished| = 4.)
+(frontend) Launching list(real) -> list(real) -> real -> real -> bool (2 tasks) w/ 64 CPUs. 4.500000 <= MDL < 6.000000. Timeout 9.862863.
+	(ocaml: 64 CPUs. shatter: 640. |fringe| = 0. |finished| = 15.)
+(frontend) Launching list(real) -> list(real) -> real -> real -> bool (2 tasks) w/ 64 CPUs. 6.000000 <= MDL < 7.500000. Timeout 9.817257.
+	(ocaml: 64 CPUs. shatter: 640. |fringe| = 0. |finished| = 34.)
+(frontend) Launching list(real) -> list(real) -> real -> real -> bool (2 tasks) w/ 64 CPUs. 7.500000 <= MDL < 9.000000. Timeout 9.764335.
+	(ocaml: 64 CPUs. shatter: 640. |fringe| = 641. |finished| = 13.)
+(frontend) Launching list(real) -> list(real) -> real -> real -> bool (2 tasks) w/ 64 CPUs. 9.000000 <= MDL < 10.500000. Timeout 9.361022.
+	(ocaml: 64 CPUs. shatter: 640. |fringe| = 641. |finished| = 0.)
+(frontend) Launching list(real) -> list(real) -> real -> real -> bool (2 tasks) w/ 64 CPUs. 10.500000 <= MDL < 12.000000. Timeout 8.953847.
+	(ocaml: 64 CPUs. shatter: 640. |fringe| = 641. |finished| = 0.)
+We enumerated this many programs, for each task:
+	 [1139, 1139]
+Generative model enumeration results:
+HIT move_x_all_positions w/ (lambda (lambda (lambda (lambda (#(lambda (always (lambda (gt_real $0 $1)))) $0 $2))))) ; log prior = -6.010951 ; log likelihood = 0.000000
+HIT move_y_all_positions w/ (lambda (lambda (lambda (lambda (#(lambda (always (lambda (gt_real $0 $1)))) $0 $2))))) ; log prior = -6.010951 ; log likelihood = 0.000000
+Hits 2/2 tasks
+Average description length of a program solving a task: 6.010951 nats
+Generative model average:  0 sec.	median: 0 	max: 0 	standard deviation 0
+Currently using this much memory: 183164928
+Frontiers discovered top down: 2
+Total frontiers: 2
+Currently using this much memory: 183164928
+Showing the top 5 programs in each frontier being sent to the compressor:
+move_x_all_positions
+-0.32	(lambda (lambda (lambda (lambda (#(lambda (always (lambda (gt_real $0 $1)))) $0 $2)))))
+-1.69	(lambda (lambda (lambda (lambda (#(lambda (always (lambda (gt_real $0 $1)))) $0 (cdr $2))))))
+-3.06	(lambda (lambda (lambda (lambda (#(lambda (always (lambda (gt_real $0 $1)))) $0 (cdr (cdr $2)))))))
+-4.42	(lambda (lambda (lambda (lambda (#(lambda (always (lambda (gt_real $0 $1)))) $0 (cdr (cdr (cdr $2))))))))
+-4.50	(lambda (lambda (lambda (lambda (#(lambda (always (lambda (gt_real $0 $1)))) $0 (cons (car $2) $2))))))
+
+move_y_all_positions
+-0.32	(lambda (lambda (lambda (lambda (#(lambda (always (lambda (gt_real $0 $1)))) $0 $2)))))
+-1.69	(lambda (lambda (lambda (lambda (#(lambda (always (lambda (gt_real $0 $1)))) $0 (cdr $2))))))
+-3.06	(lambda (lambda (lambda (lambda (#(lambda (always (lambda (gt_real $0 $1)))) $0 (cdr (cdr $2)))))))
+-4.42	(lambda (lambda (lambda (lambda (#(lambda (always (lambda (gt_real $0 $1)))) $0 (cdr (cdr (cdr $2))))))))
+-4.50	(lambda (lambda (lambda (lambda (#(lambda (always (lambda (gt_real $0 $1)))) $0 (cons (car $2) $2))))))
+
+Compression message saved to: compressionMessages/2025-12-03T01:15:23.867887
+Compression backend will run for most 99 iterations
+Found 0 alignments; 
+Found 0 alignments; 
+Found 0 alignments; 
+Total number of candidates: 382
+Constructed version spaces and coalesced candidates in 128.4182071685791ms.
+Trimmed down the beam, have only 295 best candidates
+Rewrote topK in 98.291397094726562ms.
+Initial score: -52.567664
+Initial language score: 0.000000
+Initial joint score: -52.567664 using LC of 0.000000
+Here in the master worker: we still have 0 language alignments;
+Scored candidates in 32.366752624511719ms.
+Best MDL score: -56.688045 with (always ($0 gt_real))
+No improvement possible with MDL.
+Scored candidates with language and grammar in 28.91850471496582ms.
+Best joint score: -56.688045 with (always ($0 gt_real))
+No improvement possible with joint score.
+Completed one step of memory consolidation in 295.23563385009766ms.
+completed ocaml compression in 295.25566101074219ms.
+Finished consolidation.
+Induced a grammar in 0.3 seconds
+Grammar after iteration 2:
+-0.011772	t0	$_
+0.000000	bool -> bool -> pair(bool, bool)	pair
+-0.063710	list(t0) -> list(t0)	cdr
+-0.064680	(real -> bool) -> list(real) -> bool	always
+-0.064774	real -> real -> bool	gt_real
+-0.065104	bool -> bool	not
+-0.065104	real -> real -> bool	eq_real
+-0.065199	(real -> bool) -> list(real) -> bool	eventually
+-0.065246	bool	true
+-0.065246	bool -> bool -> bool	and
+-0.065246	bool -> bool -> bool	or
+-0.065246	real -> bool	eq0_real
+-0.065246	real -> bool	gt0_real
+-0.065246	(real -> bool) -> (real -> bool) -> list(real) -> bool	until
+-0.065246	pair(bool, bool) -> bool	pair_first
+-0.065246	pair(bool, bool) -> bool	pair_second
+-0.065246	list(t0) -> bool	empty?
+-0.077048	t0 -> list(t0) -> list(t0)	cons
+-0.194576	list(t0) -> t0	car
+-0.001283	real -> list(real) -> bool	#(lambda (always (lambda (gt_real $0 $1))))
+Currently using this much memory: 183164928
+Exported checkpoint to experimentOutputs/ball_on_ramp/2025-12-03T01:15:16.522383_aic=1.0_arity=3_ET=10_it=2_MF=10_noConsolidation=False_pc=30.0_RW=False_solver=ocaml_STM=True_L=1.0_TRR=default_K=2_topkNotMAP=False_rec=False.pickle
+WARNING: Do not have an English description of:
+ #(lambda (always (lambda (gt_real $0 $1))))
+
+Exporting primitive graph to experimentOutputs/ball_on_ramp/2025-12-03T01:15:16.522383_primitives_1_depth
+{#(lambda (always (lambda (gt_real $0 $1))))}
+digraph {
+	graph [rankdir=LR]
+	f0 [label=<f0=(λ (x) (always (λ (y) <br /> (gt_real y x))))>]
+}
+Exported primitive graph to experimentOutputs/ball_on_ramp/2025-12-03T01:15:16.522383_primitives_1_unordered
+ecIterator count 1
+Currently using this much memory: 183164928
+Currently using this much memory: 183164928
+Using a waking task batch of size: 2
+Disabling parallelism on the Python side because we only have one job.
+If you are using ocaml or bottom, there could still be parallelism.
+(frontend) Launching list(real) -> list(real) -> real -> real -> bool (2 tasks) w/ 64 CPUs. 0.000000 <= MDL < 1.500000. Timeout 10.000000.
+	(ocaml: 64 CPUs. shatter: 640. |fringe| = 0. |finished| = 0.)
+(frontend) Launching list(real) -> list(real) -> real -> real -> bool (2 tasks) w/ 64 CPUs. 1.500000 <= MDL < 3.000000. Timeout 9.933600.
+	(ocaml: 64 CPUs. shatter: 640. |fringe| = 0. |finished| = 1.)
+(frontend) Launching list(real) -> list(real) -> real -> real -> bool (2 tasks) w/ 64 CPUs. 3.000000 <= MDL < 4.500000. Timeout 9.890685.
+	(ocaml: 64 CPUs. shatter: 640. |fringe| = 0. |finished| = 4.)
+(frontend) Launching list(real) -> list(real) -> real -> real -> bool (2 tasks) w/ 64 CPUs. 4.500000 <= MDL < 6.000000. Timeout 9.847401.
+	(ocaml: 64 CPUs. shatter: 640. |fringe| = 0. |finished| = 15.)
+(frontend) Launching list(real) -> list(real) -> real -> real -> bool (2 tasks) w/ 64 CPUs. 6.000000 <= MDL < 7.500000. Timeout 9.808091.
+	(ocaml: 64 CPUs. shatter: 640. |fringe| = 0. |finished| = 34.)
+(frontend) Launching list(real) -> list(real) -> real -> real -> bool (2 tasks) w/ 64 CPUs. 7.500000 <= MDL < 9.000000. Timeout 9.753520.
+	(ocaml: 64 CPUs. shatter: 640. |fringe| = 641. |finished| = 13.)
+(frontend) Launching list(real) -> list(real) -> real -> real -> bool (2 tasks) w/ 64 CPUs. 9.000000 <= MDL < 10.500000. Timeout 9.313779.
+	(ocaml: 64 CPUs. shatter: 640. |fringe| = 641. |finished| = 0.)
+(frontend) Launching list(real) -> list(real) -> real -> real -> bool (2 tasks) w/ 64 CPUs. 10.500000 <= MDL < 12.000000. Timeout 8.888869.
+	(ocaml: 64 CPUs. shatter: 640. |fringe| = 641. |finished| = 0.)
+We enumerated this many programs, for each task:
+	 [1139, 1139]
+Generative model enumeration results:
+HIT move_x_all_positions w/ (lambda (lambda (lambda (lambda (#(lambda (always (lambda (gt_real $0 $1)))) $0 $2))))) ; log prior = -6.010951 ; log likelihood = 0.000000
+HIT move_y_all_positions w/ (lambda (lambda (lambda (lambda (#(lambda (always (lambda (gt_real $0 $1)))) $0 $2))))) ; log prior = -6.010951 ; log likelihood = 0.000000
+Hits 2/2 tasks
+Average description length of a program solving a task: 6.010951 nats
+Generative model average:  0 sec.	median: 0 	max: 0 	standard deviation 0
+Currently using this much memory: 183517184
+Frontiers discovered top down: 2
+Total frontiers: 2
+Currently using this much memory: 183517184
+Showing the top 5 programs in each frontier being sent to the compressor:
+move_x_all_positions
+-0.32	(lambda (lambda (lambda (lambda (#(lambda (always (lambda (gt_real $0 $1)))) $0 $2)))))
+-1.69	(lambda (lambda (lambda (lambda (#(lambda (always (lambda (gt_real $0 $1)))) $0 (cdr $2))))))
+-3.06	(lambda (lambda (lambda (lambda (#(lambda (always (lambda (gt_real $0 $1)))) $0 (cdr (cdr $2)))))))
+-4.42	(lambda (lambda (lambda (lambda (#(lambda (always (lambda (gt_real $0 $1)))) $0 (cdr (cdr (cdr $2))))))))
+-4.50	(lambda (lambda (lambda (lambda (#(lambda (always (lambda (gt_real $0 $1)))) $0 (cons (car $2) $2))))))
+
+move_y_all_positions
+-0.32	(lambda (lambda (lambda (lambda (#(lambda (always (lambda (gt_real $0 $1)))) $0 $2)))))
+-1.69	(lambda (lambda (lambda (lambda (#(lambda (always (lambda (gt_real $0 $1)))) $0 (cdr $2))))))
+-3.06	(lambda (lambda (lambda (lambda (#(lambda (always (lambda (gt_real $0 $1)))) $0 (cdr (cdr $2)))))))
+-4.42	(lambda (lambda (lambda (lambda (#(lambda (always (lambda (gt_real $0 $1)))) $0 (cdr (cdr (cdr $2))))))))
+-4.50	(lambda (lambda (lambda (lambda (#(lambda (always (lambda (gt_real $0 $1)))) $0 (cons (car $2) $2))))))
+
+Compression message saved to: compressionMessages/2025-12-03T01:15:25.868184
+Compression backend will run for most 99 iterations
+Found 0 alignments; 
+Found 0 alignments; 
+Found 0 alignments; 
+Total number of candidates: 382
+Constructed version spaces and coalesced candidates in 129.51111793518066ms.
+Trimmed down the beam, have only 295 best candidates
+Rewrote topK in 77.816963195800781ms.
+Initial score: -52.567664
+Initial language score: 0.000000
+Initial joint score: -52.567664 using LC of 0.000000
+Here in the master worker: we still have 0 language alignments;
+Scored candidates in 34.387111663818359ms.
+Best MDL score: -56.688045 with (always ($0 gt_real))
+No improvement possible with MDL.
+Scored candidates with language and grammar in 28.960466384887695ms.
+Best joint score: -56.688045 with (always ($0 gt_real))
+No improvement possible with joint score.
+Completed one step of memory consolidation in 279.1750431060791ms.
+completed ocaml compression in 279.20794486999512ms.
+Finished consolidation.
+Induced a grammar in 0.3 seconds
+Grammar after iteration 3:
+-0.011772	t0	$_
+0.000000	bool -> bool -> pair(bool, bool)	pair
+-0.063710	list(t0) -> list(t0)	cdr
+-0.064680	(real -> bool) -> list(real) -> bool	always
+-0.064774	real -> real -> bool	gt_real
+-0.065104	bool -> bool	not
+-0.065104	real -> real -> bool	eq_real
+-0.065199	(real -> bool) -> list(real) -> bool	eventually
+-0.065246	bool	true
+-0.065246	bool -> bool -> bool	and
+-0.065246	bool -> bool -> bool	or
+-0.065246	real -> bool	eq0_real
+-0.065246	real -> bool	gt0_real
+-0.065246	(real -> bool) -> (real -> bool) -> list(real) -> bool	until
+-0.065246	pair(bool, bool) -> bool	pair_first
+-0.065246	pair(bool, bool) -> bool	pair_second
+-0.065246	list(t0) -> bool	empty?
+-0.077048	t0 -> list(t0) -> list(t0)	cons
+-0.194576	list(t0) -> t0	car
+-0.001283	real -> list(real) -> bool	#(lambda (always (lambda (gt_real $0 $1))))
+Currently using this much memory: 183517184
+Exported checkpoint to experimentOutputs/ball_on_ramp/2025-12-03T01:15:16.522383_aic=1.0_arity=3_ET=10_it=3_MF=10_noConsolidation=False_pc=30.0_RW=False_solver=ocaml_STM=True_L=1.0_TRR=default_K=2_topkNotMAP=False_rec=False.pickle
+WARNING: Do not have an English description of:
+ #(lambda (always (lambda (gt_real $0 $1))))
+
+Exporting primitive graph to experimentOutputs/ball_on_ramp/2025-12-03T01:15:16.522383_primitives_2_depth
+{#(lambda (always (lambda (gt_real $0 $1))))}
+digraph {
+	graph [rankdir=LR]
+	f0 [label=<f0=(λ (x) (always (λ (y) <br /> (gt_real y x))))>]
+}
+Exported primitive graph to experimentOutputs/ball_on_ramp/2025-12-03T01:15:16.522383_primitives_2_unordered
+ecIterator count 2
