@@ -306,6 +306,14 @@ def main():
                         yw += np.sin(theta_array)*params["ball_radius"]
                         xw = [round(x, args.round_decimals) for x in xw]
                         yw = [round(y, args.round_decimals) for y in yw]
+                        
+                        not_on_ramp_next = y_next - params["ball_radius"]/2 < 0.01
+                        theta_next = 0.0 if not_on_ramp_next else params["ramp_theta"]
+                        x_next += np.cos(theta_next) * params["ball_radius"]
+                        y_next += np.sin(theta_next) * params["ball_radius"]
+                        if args.round_decimals is not None:
+                            x_next = round(x_next, args.round_decimals)
+                            y_next = round(y_next, args.round_decimals)
                     
                     labels = next_step_bools(xw, yw, x_next, y_next, eps=args.eps)
                     
