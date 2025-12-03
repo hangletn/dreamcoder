@@ -41,7 +41,7 @@ def _load_jsonl(path=None):
     return by_t
 
 
-def get_sim_info(box_pos, jsonl_path=None, tol=1e-6):
+def get_sim_info(box_pos, jsonl_path=None, tol=1e-6, filter_falling_ball=True):
     """
     Get examples for a specific obstacle position from JSONL.
     Used by main.py to load examples from each position, which are then
@@ -71,23 +71,37 @@ def get_sim_info(box_pos, jsonl_path=None, tol=1e-6):
 
         move_x = bool(rec["out"]["move_x"])
         move_y = bool(rec["out"]["move_y"])
-
         meta = rec.get("meta", {})
         ball_radius = float(meta.get("ball_radius", 25.0))
         box_size = float(meta.get("box_size", 50.0))
         ramp_theta = float(meta.get("ramp_theta", -0.2914567944778671))
-
-        examples.append({
-            "ball_x": xs,
-            "ball_y": ys,
-            "obstacle_x": obx,
-            "obstacle_y": oby,
-            "move_x": move_x,
-            "move_y": move_y,
-            "ball_radius": ball_radius,
-            "box_size": box_size,
-            "ramp_theta": ramp_theta,
-        })
+        if filter_falling_ball:
+            if not move_x and move_y: # not account for ball falling down for now
+                pass
+            else:
+                examples.append({
+                    "ball_x": xs,
+                    "ball_y": ys,
+                    "obstacle_x": obx,
+                    "obstacle_y": oby,
+                    "move_x": move_x,
+                    "move_y": move_y,
+                    "ball_radius": ball_radius,
+                    "box_size": box_size,
+                    "ramp_theta": ramp_theta,
+                })
+        else:
+            examples.append({
+                "ball_x": xs,
+                "ball_y": ys,
+                "obstacle_x": obx,
+                "obstacle_y": oby,
+                "move_x": move_x,
+                "move_y": move_y,
+                "ball_radius": ball_radius,
+                "box_size": box_size,
+                "ramp_theta": ramp_theta,
+            })
 
     return examples
 

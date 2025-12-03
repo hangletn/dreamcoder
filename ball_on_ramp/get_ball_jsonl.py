@@ -283,6 +283,7 @@ def main():
                     videos_recorded += 1
                 else:
                     xs, ys = simulate_positions(space, body, args.dt, steps_total,
+                                                params["ramp_theta"], obstacle_y=obstacle_y,
                                                obstacle_x=obstacle_x,
                                                ball_radius=params["ball_radius"])
                     frames = None
